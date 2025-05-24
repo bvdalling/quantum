@@ -613,14 +613,16 @@
                 }
 
                 setupMobileControls() {
-                    // Enhanced mobile controls with multi-touch support
+                    // Enhanced mobile controls with true multi-touch support
+                    this.input.addPointer(2); // Enable multi-touch (up to 3 fingers)
+                    
                     this.input.on('pointerdown', (pointer) => {
                         const x = pointer.x;
                         const y = pointer.y;
                         const screenWidth = this.scale.width;
                         const screenHeight = this.scale.height;
                         
-                        console.log(`Pointer down at: ${x}, ${y} on ${screenWidth}x${screenHeight}`);
+                        console.log(`Pointer ${pointer.id} down at: ${x}, ${y}`);
                         
                         // Check if this is a movement touch (left or right third)
                         if (x < screenWidth * 0.33) {
@@ -666,21 +668,34 @@
                         } else if (x > screenWidth * 0.67) {
                             this.mobileInput.right = true;
                             this.mobileInput.left = false;
-                        } else {
-                            // In middle area, maintain current movement
-                            // Don't stop movement when dragging through middle
                         }
                     });
 
                     this.input.on('pointerup', (pointer) => {
-                        console.log('Pointer up');
-                        // Only stop movement if the pointer was in a movement zone
-                        const x = pointer.x;
-                        const screenWidth = this.scale.width;
+                        console.log(`Pointer ${pointer.id} up`);
                         
-                        if (x < screenWidth * 0.33) {
+                        // Check all active pointers to see if any are still in movement zones
+                        let leftStillPressed = false;
+                        let rightStillPressed = false;
+                        
+                        this.input.manager.pointers.forEach(p => {
+                            if (p.isDown && p.id !== pointer.id) {
+                                const x = p.x;
+                                const screenWidth = this.scale.width;
+                                
+                                if (x < screenWidth * 0.33) {
+                                    leftStillPressed = true;
+                                } else if (x > screenWidth * 0.67) {
+                                    rightStillPressed = true;
+                                }
+                            }
+                        });
+                        
+                        // Only stop movement if no other pointers are in that zone
+                        if (!leftStillPressed) {
                             this.mobileInput.left = false;
-                        } else if (x > screenWidth * 0.67) {
+                        }
+                        if (!rightStillPressed) {
                             this.mobileInput.right = false;
                         }
                     });
