@@ -140,7 +140,31 @@
 
                 // Audio system for generating retro arcade sounds
                 createAudioContext() {
-                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    // Don't create audio context immediately on mobile
+                    this.audioContext = null;
+                    this.audioInitialized = false;
+                }
+
+                initializeAudio() {
+                    if (this.audioInitialized) return;
+                    
+                    try {
+                        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        
+                        // Resume audio context if it's suspended (common on mobile)
+                        if (this.audioContext.state === 'suspended') {
+                            this.audioContext.resume().then(() => {
+                                console.log('Audio context resumed');
+                                this.audioInitialized = true;
+                            });
+                        } else {
+                            console.log('Audio context created');
+                            this.audioInitialized = true;
+                        }
+                    } catch (error) {
+                        console.log('Audio not supported:', error);
+                        this.audioInitialized = false;
+                    }
                 }
 
                 // Screen shake effect
@@ -154,7 +178,15 @@
                 }
 
                 playSound(type, options = {}) {
-                    if (!this.audioContext) return;
+                    // Initialize audio on first sound play
+                    if (!this.audioInitialized) {
+                        this.initializeAudio();
+                    }
+                    
+                    if (!this.audioContext || this.audioContext.state !== 'running') {
+                        console.log('Audio context not ready');
+                        return;
+                    }
 
                     const now = this.audioContext.currentTime;
                     const oscillator = this.audioContext.createOscillator();
@@ -616,7 +648,17 @@
                     // Enhanced mobile controls with true multi-touch support
                     this.input.addPointer(2); // Enable multi-touch (up to 3 fingers)
                     
+                    // Initialize audio on first touch
+                    let audioInitialized = false;
+                    
                     this.input.on('pointerdown', (pointer) => {
+                        // Initialize audio on first touch
+                        if (!audioInitialized) {
+                            this.initializeAudio();
+                            audioInitialized = true;
+                            console.log('Audio initialized on first touch');
+                        }
+                        
                         const x = pointer.x;
                         const y = pointer.y;
                         const screenWidth = this.scale.width;
