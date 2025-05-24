@@ -516,10 +516,11 @@
                     this.originalCameraX = 0;
                     this.originalCameraY = 0;
 
-                    // Mobile input state
+                    // Mobile input state - track active touches
                     this.mobileInput = {
                         left: false,
-                        right: false
+                        right: false,
+                        activeTouch: null
                     };
 
                     // Touch tracking
@@ -612,33 +613,37 @@
                 }
 
                 setupMobileControls() {
-                    // Simple mobile controls using Phaser's built-in pointer system
+                    // Enhanced mobile controls with multi-touch support
                     this.input.on('pointerdown', (pointer) => {
                         const x = pointer.x;
                         const y = pointer.y;
                         const screenWidth = this.scale.width;
                         const screenHeight = this.scale.height;
                         
-                        console.log(`Pointer at: ${x}, ${y} on ${screenWidth}x${screenHeight}`);
+                        console.log(`Pointer down at: ${x}, ${y} on ${screenWidth}x${screenHeight}`);
                         
-                        // Left third - move left
+                        // Check if this is a movement touch (left or right third)
                         if (x < screenWidth * 0.33) {
                             this.mobileInput.left = true;
-                        }
-                        // Right third - move right  
-                        else if (x > screenWidth * 0.67) {
+                            console.log('Left movement started');
+                        } else if (x > screenWidth * 0.67) {
                             this.mobileInput.right = true;
+                            console.log('Right movement started');
                         }
-                        // Middle area
-                        else {
+                        
+                        // Middle area actions (can happen simultaneously with movement)
+                        if (x >= screenWidth * 0.33 && x <= screenWidth * 0.67) {
                             // Top half - dimension shift
                             if (y < screenHeight * 0.5) {
+                                console.log('Dimension shift');
                                 this.shiftDimension();
                                 this.playSound('dimensionShift');
                             }
                             // Bottom half - jump
                             else {
+                                console.log('Jump attempt');
                                 if (this.player && this.player.body && this.player.body.touching.down) {
+                                    console.log('Jumping!');
                                     this.player.setVelocityY(-this.currentJumpVelocity);
                                     this.player.jumpState = "rising";
                                     this.playSound('jump');
@@ -647,9 +652,37 @@
                         }
                     });
 
-                    this.input.on('pointerup', () => {
-                        this.mobileInput.left = false;
-                        this.mobileInput.right = false;
+                    // Handle pointer move for continuous movement
+                    this.input.on('pointermove', (pointer) => {
+                        if (!pointer.isDown) return;
+                        
+                        const x = pointer.x;
+                        const screenWidth = this.scale.width;
+                        
+                        // Update movement based on current position
+                        if (x < screenWidth * 0.33) {
+                            this.mobileInput.left = true;
+                            this.mobileInput.right = false;
+                        } else if (x > screenWidth * 0.67) {
+                            this.mobileInput.right = true;
+                            this.mobileInput.left = false;
+                        } else {
+                            // In middle area, maintain current movement
+                            // Don't stop movement when dragging through middle
+                        }
+                    });
+
+                    this.input.on('pointerup', (pointer) => {
+                        console.log('Pointer up');
+                        // Only stop movement if the pointer was in a movement zone
+                        const x = pointer.x;
+                        const screenWidth = this.scale.width;
+                        
+                        if (x < screenWidth * 0.33) {
+                            this.mobileInput.left = false;
+                        } else if (x > screenWidth * 0.67) {
+                            this.mobileInput.right = false;
+                        }
                     });
                 }
 
@@ -1435,6 +1468,10 @@
                 scale: {
                     mode: Phaser.Scale.RESIZE,
                     autoCenter: Phaser.Scale.CENTER_BOTH
+                },
+                render: {
+                    antialias: false,
+                    pixelArt: true
                 }
             };
 
