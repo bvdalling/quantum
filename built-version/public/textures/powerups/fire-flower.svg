@@ -1,0 +1,29 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+    <!-- Fire flower powerup -->
+    <!-- Main flower body -->
+    <circle cx="16" cy="16" r="8" fill="#FF4500" />
+    <circle cx="16" cy="16" r="6" fill="#FF6347" />
+    <circle cx="16" cy="16" r="4" fill="#FFA500" />
+
+    <!-- Petals -->
+    <ellipse cx="16" cy="8" rx="3" ry="6" fill="#FF0000" />
+    <ellipse cx="24" cy="16" rx="6" ry="3" fill="#FF0000" />
+    <ellipse cx="16" cy="24" rx="3" ry="6" fill="#FF0000" />
+    <ellipse cx="8" cy="16" rx="6" ry="3" fill="#FF0000" />
+
+    <!-- Diagonal petals -->
+    <ellipse cx="11.76" cy="11.76" rx="2.5" ry="5" fill="#DC143C"
+        transform="rotate(-45 11.76 11.76)" />
+    <ellipse cx="20.24" cy="11.76" rx="2.5" ry="5" fill="#DC143C" transform="rotate(45 20.24 11.76)" />
+    <ellipse cx="20.24" cy="20.24" rx="2.5" ry="5" fill="#DC143C"
+        transform="rotate(135 20.24 20.24)" />
+    <ellipse cx="11.76" cy="20.24" rx="2.5" ry="5" fill="#DC143C"
+        transform="rotate(-135 11.76 20.24)" />
+
+    <!-- Inner flame pattern -->
+    <circle cx="16" cy="16" r="3" fill="#FFFF00" />
+    <circle cx="16" cy="16" r="2" fill="#FFFFFF" />
+
+    <!-- Stem -->
+    <rect x="15" y="24" width="2" height="6" fill="#228B22" />
+</svg>

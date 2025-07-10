@@ -15,8 +15,13 @@ export const VIEWPORT_HEIGHT = VIEWPORT_TILES_HIGH * TILE_SIZE; // 480 pixels
 
 // === PHYSICS CONSTANTS ===
 export const PLAYER_SPEED = 180;
-export const JUMP_VELOCITY = 400;
+export const JUMP_VELOCITY = 450; // Initial jump velocity
+export const MIN_JUMP_VELOCITY = 200; // Minimum jump if button released quickly
 export const GRAVITY = 800;
+export const FALL_GRAVITY = 1200; // Faster falling for snappier feel
+export const AIR_CONTROL = 0.8; // Air movement control factor (80% of ground speed)
+export const JUMP_BUFFER_TIME = 150; // ms to allow jump input before landing
+export const COYOTE_TIME = 100; // ms after leaving ground where jump is still allowed
 
 // === GAME STATES ===
 export enum Dimension {
@@ -51,7 +56,38 @@ export enum TileType {
   EMPTY = ".",
   PLAYER_START = "P",
   PLATFORM = "#",
-  COIN = "C",
-  POWERUP = "U",
+  COIN = "C", // Generic coin (bronze)
+  POWERUP = "U", // Generic powerup (mushroom)
   PORTAL = "E",
+  // Specific coin types
+  BRONZE_COIN = "B",
+  SILVER_COIN = "S",
+  GOLD_COIN = "G",
+  RUBY_COIN = "R",
+  // Specific powerup types
+  MUSHROOM = "M",
+  ONE_UP = "1",
+  POISON = "X",
+  FIRE_FLOWER = "F",
+  STAR = "*",
+  SPEED_BOOST = "T", // T for Turbo
+}
+
+// === COIN VALUES ===
+export const COIN_VALUES: Record<string, number> = {
+  [TileType.COIN]: 1,
+  [TileType.BRONZE_COIN]: 1,
+  [TileType.SILVER_COIN]: 5,
+  [TileType.GOLD_COIN]: 10,
+  [TileType.RUBY_COIN]: 25,
+};
+
+// === POWERUP EFFECTS ===
+export enum PowerupType {
+  MUSHROOM = "mushroom", // Score boost
+  ONE_UP = "1up", // Extra life
+  POISON = "poison", // Lose life
+  FIRE_FLOWER = "fire_flower", // Temporary invincibility
+  STAR = "star", // Super jump boost
+  SPEED_BOOST = "speed_boost", // Temporary speed boost
 }

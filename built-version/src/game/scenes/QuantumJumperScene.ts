@@ -11,10 +11,18 @@ import {
   TILE_SIZE,
   PLAYER_SPEED,
   JUMP_VELOCITY,
+  MIN_JUMP_VELOCITY,
+  GRAVITY,
+  FALL_GRAVITY,
+  AIR_CONTROL,
+  JUMP_BUFFER_TIME,
+  COYOTE_TIME,
   Dimension,
   JumpState,
   SoundType,
   TileType,
+  COIN_VALUES,
+  PowerupType,
 } from "../constants";
 import { LEVEL_MAPS } from "../data/levelMaps";
 import { AudioSystem } from "../utils/AudioSystem";
@@ -75,6 +83,9 @@ export class QuantumJumperScene extends Phaser.Scene {
     // Create procedural textures (portal and particles) after SVGs are loaded
     this.textureGenerator.createProceduralTextures();
 
+    // Create player animations
+    this.textureGenerator.createPlayerAnimations();
+
     this.initializeGameState();
     this.initializeSystems();
     this.createGameObjects();
@@ -92,6 +103,7 @@ export class QuantumJumperScene extends Phaser.Scene {
       levelTransitioning: false,
       speedBoostActive: false,
       jumpBoostActive: false,
+      invincibilityActive: false,
       currentPlayerSpeed: PLAYER_SPEED,
       currentJumpVelocity: JUMP_VELOCITY,
     };
@@ -99,6 +111,10 @@ export class QuantumJumperScene extends Phaser.Scene {
     this.playerState = {
       jumpState: JumpState.NONE,
       animationState: "standing" as any,
+      isJumpPressed: false,
+      jumpBufferTimer: 0,
+      coyoteTimer: 0,
+      wasOnGround: false,
     };
 
     this.mobileInput = { left: false, right: false };
@@ -133,6 +149,13 @@ export class QuantumJumperScene extends Phaser.Scene {
     this.player = this.physics.add.sprite(0, 0, "player");
     this.player.setBounce(0);
     this.player.setCollideWorldBounds(false); // We handle boundaries manually
+
+    // Start with idle animation (will be set after animations are created)
+    this.time.delayedCall(100, () => {
+      if (this.player && this.player.anims) {
+        this.player.play("player-idle");
+      }
+    });
   }
 
   private createGroups(): void {
@@ -210,6 +233,7 @@ export class QuantumJumperScene extends Phaser.Scene {
   update(): void {
     if (!this.player || !this.player.body) return;
 
+    this.updateJumpTimers();
     this.handlePlayerMovement();
     this.handlePlayerJump();
     this.handleDimensionShift();
@@ -217,30 +241,155 @@ export class QuantumJumperScene extends Phaser.Scene {
     this.updateUI();
   }
 
+  private updateJumpTimers(): void {
+    const deltaTime = this.game.loop.delta;
+
+    // Update jump buffer timer
+    if (this.playerState.jumpBufferTimer > 0) {
+      this.playerState.jumpBufferTimer -= deltaTime;
+    }
+
+    // Update coyote timer
+    if (this.playerState.coyoteTimer > 0) {
+      this.playerState.coyoteTimer -= deltaTime;
+    }
+  }
+
   private handlePlayerMovement(): void {
+    const isOnGround = this.player.body!.touching.down;
+    const playerVelocityY = this.player.body!.velocity.y;
+
+    // Update ground state for coyote time
+    if (isOnGround && !this.playerState.wasOnGround) {
+      // Just landed
+      this.playerState.coyoteTimer = 0;
+    } else if (!isOnGround && this.playerState.wasOnGround) {
+      // Just left ground - start coyote timer
+      this.playerState.coyoteTimer = COYOTE_TIME;
+    }
+    this.playerState.wasOnGround = isOnGround;
+
+    // Calculate movement speed (reduced in air for Mario-like feel)
+    const moveSpeed = isOnGround
+      ? this.gameState.currentPlayerSpeed
+      : this.gameState.currentPlayerSpeed * AIR_CONTROL;
+
+    // Handle horizontal movement
     if (
       this.cursors.left.isDown ||
       this.wasd.A.isDown ||
       this.mobileInput.left
     ) {
-      this.player.setVelocityX(-this.gameState.currentPlayerSpeed);
+      this.player.setVelocityX(-moveSpeed);
+      this.player.setFlipX(true); // Face left
+
+      // Play walking animation if on ground
+      if (isOnGround && this.player.anims.currentAnim?.key !== "player-walk") {
+        this.player.play("player-walk");
+      }
     } else if (
       this.cursors.right.isDown ||
       this.wasd.D.isDown ||
       this.mobileInput.right
     ) {
-      this.player.setVelocityX(this.gameState.currentPlayerSpeed);
+      this.player.setVelocityX(moveSpeed);
+      this.player.setFlipX(false); // Face right
+
+      // Play walking animation if on ground
+      if (isOnGround && this.player.anims.currentAnim?.key !== "player-walk") {
+        this.player.play("player-walk");
+      }
     } else {
       this.player.setVelocityX(0);
+
+      // Play idle animation when not moving and on ground
+      if (isOnGround && this.player.anims.currentAnim?.key !== "player-idle") {
+        this.player.play("player-idle");
+      }
+    }
+
+    // Handle dynamic gravity for better jump feel
+    if (!isOnGround) {
+      if (playerVelocityY < 0 && !this.playerState.isJumpPressed) {
+        // Player is rising but not holding jump - apply extra gravity for short hop
+        (this.player.body as Phaser.Physics.Arcade.Body).setGravityY(
+          FALL_GRAVITY - GRAVITY
+        );
+      } else if (playerVelocityY > 0) {
+        // Player is falling - apply faster gravity
+        (this.player.body as Phaser.Physics.Arcade.Body).setGravityY(
+          FALL_GRAVITY - GRAVITY
+        );
+      } else {
+        // Normal rising with jump held
+        (this.player.body as Phaser.Physics.Arcade.Body).setGravityY(0);
+      }
+    } else {
+      // On ground - normal gravity
+      (this.player.body as Phaser.Physics.Arcade.Body).setGravityY(0);
+    }
+
+    // Handle jump/fall animations based on vertical movement
+    if (!isOnGround) {
+      if (playerVelocityY < 0) {
+        // Player is rising (jumping)
+        if (this.player.anims.currentAnim?.key !== "player-jump") {
+          this.player.play("player-jump");
+        }
+        this.playerState.jumpState = JumpState.RISING;
+      } else if (playerVelocityY > 0) {
+        // Player is falling
+        if (this.player.anims.currentAnim?.key !== "player-fall") {
+          this.player.play("player-fall");
+        }
+        this.playerState.jumpState = JumpState.FALLING;
+      }
+    } else {
+      // Player is on ground
+      this.playerState.jumpState = JumpState.NONE;
     }
   }
 
   private handlePlayerJump(): void {
     const isOnGround = this.player.body!.touching.down;
-    if ((this.cursors.up.isDown || this.wasd.W.isDown) && isOnGround) {
+    const jumpPressed = this.cursors.up.isDown || this.wasd.W.isDown;
+    const jumpJustPressed =
+      Phaser.Input.Keyboard.JustDown(this.cursors.up) ||
+      Phaser.Input.Keyboard.JustDown(this.wasd.W);
+
+    // Update jump pressed state
+    this.playerState.isJumpPressed = jumpPressed;
+
+    // Jump buffer - if jump is pressed, start buffer timer
+    if (jumpJustPressed) {
+      this.playerState.jumpBufferTimer = JUMP_BUFFER_TIME;
+    }
+
+    // Check if we can jump (on ground, in coyote time, or jump buffered)
+    const canJump =
+      isOnGround ||
+      this.playerState.coyoteTimer > 0 ||
+      this.playerState.jumpBufferTimer > 0;
+
+    // Execute jump
+    if (canJump && this.playerState.jumpBufferTimer > 0) {
       this.player.setVelocityY(-this.gameState.currentJumpVelocity);
       this.playerState.jumpState = JumpState.RISING;
+      this.player.play("player-jump"); // Immediately play jump animation
       this.audioSystem.playSound(SoundType.JUMP);
+
+      // Clear timers
+      this.playerState.jumpBufferTimer = 0;
+      this.playerState.coyoteTimer = 0;
+    }
+
+    // Variable jump height - if jump button is released while rising, cut jump short
+    if (
+      !jumpPressed &&
+      this.playerState.jumpState === JumpState.RISING &&
+      this.player.body!.velocity.y < -MIN_JUMP_VELOCITY
+    ) {
+      this.player.setVelocityY(-MIN_JUMP_VELOCITY);
     }
   }
 
@@ -397,29 +546,45 @@ export class QuantumJumperScene extends Phaser.Scene {
         platform.refreshBody();
         break;
 
+      // Handle all coin types
       case TileType.COIN:
-        const coinKey = `${this.gameState.level}_${row}_${col}_C`;
+      case TileType.BRONZE_COIN:
+      case TileType.SILVER_COIN:
+      case TileType.GOLD_COIN:
+      case TileType.RUBY_COIN:
+        const coinKey = `${this.gameState.level}_${row}_${col}_${tileType}`;
         if (!this.collectedItems.has(coinKey)) {
+          const textureKey = TextureGenerator.getTextureKey(tileType);
           const coin = this.collectibles.create(
             x,
             y,
-            "coin"
+            textureKey
           ) as Phaser.Physics.Arcade.Sprite & CollectibleData;
           coin.mapRow = row;
           coin.mapCol = col;
+          coin.tileType = tileType;
         }
         break;
 
+      // Handle all powerup types
       case TileType.POWERUP:
-        const powerupKey = `${this.gameState.level}_${row}_${col}_U`;
+      case TileType.MUSHROOM:
+      case TileType.ONE_UP:
+      case TileType.POISON:
+      case TileType.FIRE_FLOWER:
+      case TileType.STAR:
+      case TileType.SPEED_BOOST:
+        const powerupKey = `${this.gameState.level}_${row}_${col}_${tileType}`;
         if (!this.collectedItems.has(powerupKey)) {
+          const textureKey = TextureGenerator.getTextureKey(tileType);
           const powerup = this.powerups.create(
             x,
             y,
-            "powerup"
+            textureKey
           ) as Phaser.Physics.Arcade.Sprite & CollectibleData;
           powerup.mapRow = row;
           powerup.mapCol = col;
+          powerup.tileType = tileType;
         }
         break;
 
@@ -463,7 +628,7 @@ export class QuantumJumperScene extends Phaser.Scene {
     _player: Phaser.Physics.Arcade.Sprite,
     coin: Phaser.Physics.Arcade.Sprite & CollectibleData
   ): void {
-    const coinKey = `${this.gameState.level}_${coin.mapRow}_${coin.mapCol}_C`;
+    const coinKey = `${this.gameState.level}_${coin.mapRow}_${coin.mapCol}_${coin.tileType}`;
     this.collectedItems.add(coinKey);
 
     this.particles.setPosition(coin.x, coin.y);
@@ -471,14 +636,17 @@ export class QuantumJumperScene extends Phaser.Scene {
     coin.destroy();
 
     this.audioSystem.playSound(SoundType.COIN);
-    this.gameState.score++;
+
+    // Add score based on coin type
+    const coinValue = COIN_VALUES[coin.tileType] || 1;
+    this.gameState.score += coinValue;
   }
 
   private collectPowerup(
     _player: Phaser.Physics.Arcade.Sprite,
     powerup: Phaser.Physics.Arcade.Sprite & CollectibleData
   ): void {
-    const powerupKey = `${this.gameState.level}_${powerup.mapRow}_${powerup.mapCol}_U`;
+    const powerupKey = `${this.gameState.level}_${powerup.mapRow}_${powerup.mapCol}_${powerup.tileType}`;
     this.collectedItems.add(powerupKey);
 
     this.particles.setPosition(powerup.x, powerup.y);
@@ -487,15 +655,59 @@ export class QuantumJumperScene extends Phaser.Scene {
 
     this.audioSystem.playSound(SoundType.POWERUP);
 
-    // Apply speed boost
-    this.gameState.currentPlayerSpeed = 220;
-    this.gameState.currentJumpVelocity = 380;
+    // Apply powerup effect based on type
+    this.applyPowerupEffect(powerup.tileType);
+  }
 
-    // Reset after 5 seconds
-    this.time.delayedCall(5000, () => {
-      this.gameState.currentPlayerSpeed = PLAYER_SPEED;
-      this.gameState.currentJumpVelocity = JUMP_VELOCITY;
-    });
+  private applyPowerupEffect(tileType: TileType): void {
+    switch (tileType) {
+      case TileType.POWERUP:
+      case TileType.MUSHROOM:
+        // Score boost
+        this.gameState.score += 50;
+        break;
+
+      case TileType.ONE_UP:
+        // Extra life
+        this.gameState.lives++;
+        break;
+
+      case TileType.POISON:
+        // Lose a life
+        this.gameState.lives--;
+        if (this.gameState.lives <= 0) {
+          this.gameOver();
+        }
+        break;
+
+      case TileType.FIRE_FLOWER:
+        // Temporary invincibility
+        this.gameState.invincibilityActive = true;
+        this.time.delayedCall(8000, () => {
+          this.gameState.invincibilityActive = false;
+        });
+        break;
+
+      case TileType.STAR:
+        // Super jump boost
+        this.gameState.jumpBoostActive = true;
+        this.gameState.currentJumpVelocity = 500;
+        this.time.delayedCall(10000, () => {
+          this.gameState.jumpBoostActive = false;
+          this.gameState.currentJumpVelocity = JUMP_VELOCITY;
+        });
+        break;
+
+      case TileType.SPEED_BOOST:
+        // Speed boost
+        this.gameState.speedBoostActive = true;
+        this.gameState.currentPlayerSpeed = 280;
+        this.time.delayedCall(8000, () => {
+          this.gameState.speedBoostActive = false;
+          this.gameState.currentPlayerSpeed = PLAYER_SPEED;
+        });
+        break;
+    }
   }
 
   private nextLevel(): void {

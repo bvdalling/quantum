@@ -2,7 +2,13 @@
  * Type definitions for the Quantum Jumper game
  */
 
-import { Dimension, JumpState, AnimationState } from "../constants";
+import {
+  Dimension,
+  JumpState,
+  AnimationState,
+  TileType,
+  PowerupType,
+} from "../constants";
 
 export interface GameState {
   level: number;
@@ -12,6 +18,7 @@ export interface GameState {
   levelTransitioning: boolean;
   speedBoostActive: boolean;
   jumpBoostActive: boolean;
+  invincibilityActive: boolean;
   currentPlayerSpeed: number;
   currentJumpVelocity: number;
 }
@@ -19,11 +26,23 @@ export interface GameState {
 export interface PlayerState {
   jumpState: JumpState;
   animationState: AnimationState;
+  isJumpPressed: boolean;
+  jumpBufferTimer: number;
+  coyoteTimer: number;
+  wasOnGround: boolean;
 }
 
 export interface CollectibleData {
   mapRow: number;
   mapCol: number;
+  tileType: TileType;
+}
+
+export interface PowerupData {
+  mapRow: number;
+  mapCol: number;
+  tileType: TileType;
+  powerupType: PowerupType;
 }
 
 export interface MobileInput {
