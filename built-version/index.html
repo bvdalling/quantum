@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quantum Jumper - Phaser 3</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #222;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: monospace;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    #game-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .instructions {
+      color: white;
+      text-align: center;
+      font-size: clamp(10px, 2.5vw, 14px);
+      margin-bottom: 10px;
+      padding: 0 10px;
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+    }
+
+    #mobile-controls {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 999;
+      pointer-events: none;
+    }
+
+    @media (max-width: 768px) {
+      #mobile-controls {
+        display: block;
+      }
+
+      .instructions {
+        display: none;
+      }
+
+      body {
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="game-container">
+    <div class="instructions">
+      Arrow keys or WASD to move, Space to shift dimensions<br />
+      Reach the green portal to advance to the next level!<br />
+    </div>
+    <div id="mobile-controls" style="display: none;"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+
+</html>

@@ -1,0 +1,571 @@
+/**
+ * Quantum Jumper Game Scene
+ *
+ * Main game scene that handles all gameplay mechanics
+ */
+
+import Phaser from "phaser";
+import {
+  VIEWPORT_WIDTH,
+  VIEWPORT_HEIGHT,
+  TILE_SIZE,
+  PLAYER_SPEED,
+  JUMP_VELOCITY,
+  Dimension,
+  JumpState,
+  SoundType,
+  TileType,
+} from "../constants";
+import { LEVEL_MAPS } from "../data/levelMaps";
+import { AudioSystem } from "../utils/AudioSystem";
+import { TextureGenerator } from "../utils/TextureGenerator";
+import type {
+  GameState,
+  PlayerState,
+  CollectibleData,
+  MobileInput,
+} from "../types";
+
+export class QuantumJumperScene extends Phaser.Scene {
+  // Game state
+  private gameState!: GameState;
+  private playerState!: PlayerState;
+  private mobileInput!: MobileInput;
+  private collectedItems!: Set<string>;
+
+  // Game objects
+  private player!: Phaser.Physics.Arcade.Sprite;
+  private platforms!: Phaser.Physics.Arcade.StaticGroup;
+  private collectibles!: Phaser.Physics.Arcade.StaticGroup;
+  private powerups!: Phaser.Physics.Arcade.StaticGroup;
+  private hazards!: Phaser.GameObjects.Group;
+  private portal!: Phaser.GameObjects.Sprite;
+  private background!: Phaser.GameObjects.Rectangle;
+
+  // Particles
+  private particles!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private portalParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
+
+  // UI elements
+  private scoreText!: Phaser.GameObjects.Text;
+  private livesText!: Phaser.GameObjects.Text;
+  private dimensionText!: Phaser.GameObjects.Text;
+  private levelText!: Phaser.GameObjects.Text;
+
+  // Input
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private spaceKey!: Phaser.Input.Keyboard.Key;
+  private wasd!: { [key: string]: Phaser.Input.Keyboard.Key };
+
+  // Systems
+  private audioSystem!: AudioSystem;
+  private textureGenerator!: TextureGenerator;
+
+  constructor() {
+    super({ key: "QuantumJumperScene" });
+  }
+
+  preload(): void {
+    // Initialize texture generator and load SVG assets
+    this.textureGenerator = new TextureGenerator(this);
+    this.textureGenerator.loadAllTextures();
+  }
+
+  create(): void {
+    // Create procedural textures (portal and particles) after SVGs are loaded
+    this.textureGenerator.createProceduralTextures();
+
+    this.initializeGameState();
+    this.initializeSystems();
+    this.createGameObjects();
+    this.setupInput();
+    this.generateLevel();
+    this.setupCamera();
+  }
+
+  private initializeGameState(): void {
+    this.gameState = {
+      level: 1,
+      score: 0,
+      lives: 3,
+      dimension: Dimension.LIGHT,
+      levelTransitioning: false,
+      speedBoostActive: false,
+      jumpBoostActive: false,
+      currentPlayerSpeed: PLAYER_SPEED,
+      currentJumpVelocity: JUMP_VELOCITY,
+    };
+
+    this.playerState = {
+      jumpState: JumpState.NONE,
+      animationState: "standing" as any,
+    };
+
+    this.mobileInput = { left: false, right: false };
+    this.collectedItems = new Set<string>();
+  }
+
+  private initializeSystems(): void {
+    this.audioSystem = new AudioSystem();
+  }
+
+  private createGameObjects(): void {
+    this.createBackground();
+    this.createPlayer();
+    this.createGroups();
+    this.createParticles();
+    this.createUI();
+  }
+
+  private createBackground(): void {
+    this.background = this.add.rectangle(
+      0,
+      0,
+      5000, // Large enough for any level
+      VIEWPORT_HEIGHT,
+      0x87ceeb
+    );
+    this.background.setOrigin(0, 0);
+    this.background.setScrollFactor(0.1);
+  }
+
+  private createPlayer(): void {
+    this.player = this.physics.add.sprite(0, 0, "player");
+    this.player.setBounce(0);
+    this.player.setCollideWorldBounds(false); // We handle boundaries manually
+  }
+
+  private createGroups(): void {
+    this.platforms = this.physics.add.staticGroup();
+    this.collectibles = this.physics.add.staticGroup();
+    this.powerups = this.physics.add.staticGroup();
+    this.hazards = this.add.group();
+  }
+
+  private createParticles(): void {
+    this.particles = this.add.particles(0, 0, "particle", {
+      speed: { min: 50, max: 150 },
+      scale: { start: 1, end: 0 },
+      lifespan: 600,
+      emitting: false,
+    });
+
+    this.portalParticles = this.add.particles(0, 0, "portal_particle", {
+      speed: { min: 40, max: 100 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1, end: 0 },
+      lifespan: 800,
+      emitting: false,
+      quantity: 2,
+      frequency: 100,
+      alpha: { start: 1, end: 0 },
+      blendMode: "ADD",
+    });
+  }
+
+  private createUI(): void {
+    this.scoreText = this.add
+      .text(16, 16, "Score: 0", {
+        fontSize: "18px",
+        color: "#fff",
+      })
+      .setScrollFactor(0);
+
+    this.livesText = this.add
+      .text(16, 40, "Lives: 3", {
+        fontSize: "18px",
+        color: "#fff",
+      })
+      .setScrollFactor(0);
+
+    this.dimensionText = this.add
+      .text(16, 64, "Dimension: Light", {
+        fontSize: "18px",
+        color: "#5f5fff",
+      })
+      .setScrollFactor(0);
+
+    this.levelText = this.add
+      .text(VIEWPORT_WIDTH - 120, 16, "Level: 1", {
+        fontSize: "18px",
+        color: "#fff",
+      })
+      .setScrollFactor(0);
+  }
+
+  private setupInput(): void {
+    this.cursors = this.input.keyboard!.createCursorKeys();
+    this.spaceKey = this.input.keyboard!.addKey(
+      Phaser.Input.Keyboard.KeyCodes.SPACE
+    );
+    this.wasd = this.input.keyboard!.addKeys("W,S,A,D") as {
+      [key: string]: Phaser.Input.Keyboard.Key;
+    };
+  }
+
+  private setupCamera(): void {
+    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+  }
+
+  update(): void {
+    if (!this.player || !this.player.body) return;
+
+    this.handlePlayerMovement();
+    this.handlePlayerJump();
+    this.handleDimensionShift();
+    this.handleCollisions();
+    this.updateUI();
+  }
+
+  private handlePlayerMovement(): void {
+    if (
+      this.cursors.left.isDown ||
+      this.wasd.A.isDown ||
+      this.mobileInput.left
+    ) {
+      this.player.setVelocityX(-this.gameState.currentPlayerSpeed);
+    } else if (
+      this.cursors.right.isDown ||
+      this.wasd.D.isDown ||
+      this.mobileInput.right
+    ) {
+      this.player.setVelocityX(this.gameState.currentPlayerSpeed);
+    } else {
+      this.player.setVelocityX(0);
+    }
+  }
+
+  private handlePlayerJump(): void {
+    const isOnGround = this.player.body!.touching.down;
+    if ((this.cursors.up.isDown || this.wasd.W.isDown) && isOnGround) {
+      this.player.setVelocityY(-this.gameState.currentJumpVelocity);
+      this.playerState.jumpState = JumpState.RISING;
+      this.audioSystem.playSound(SoundType.JUMP);
+    }
+  }
+
+  private handleDimensionShift(): void {
+    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+      // Store player position before dimension shift
+      const playerX = this.player.x;
+      const playerY = this.player.y;
+      const playerVelX = this.player.body!.velocity.x;
+      const playerVelY = this.player.body!.velocity.y;
+
+      // Switch dimension
+      this.gameState.dimension =
+        this.gameState.dimension === Dimension.LIGHT
+          ? Dimension.DARK
+          : Dimension.LIGHT;
+
+      // Update UI
+      this.dimensionText.setText(
+        "Dimension: " +
+          (this.gameState.dimension === Dimension.LIGHT ? "Light" : "Dark")
+      );
+      this.dimensionText.setColor(
+        this.gameState.dimension === Dimension.LIGHT ? "#5f5fff" : "#ff5f5f"
+      );
+
+      // Visual effects
+      this.particles.emitParticleAt(this.player.x, this.player.y, 20);
+      this.audioSystem.playSound(SoundType.DIMENSION);
+
+      // Reload level with new dimension
+      this.clearLevel();
+      const levelData =
+        LEVEL_MAPS[(this.gameState.level - 1) % LEVEL_MAPS.length];
+      const currentMap = levelData[this.gameState.dimension];
+      this.loadLevelFromMap(currentMap);
+
+      // Restore player position and velocity
+      this.player.setPosition(playerX, playerY);
+      this.player.setVelocity(playerVelX, playerVelY);
+
+      // Re-setup physics
+      this.setupPhysicsCollisions();
+    }
+  }
+
+  private handleCollisions(): void {
+    const levelData =
+      LEVEL_MAPS[(this.gameState.level - 1) % LEVEL_MAPS.length];
+    const currentMap = levelData[this.gameState.dimension];
+    const mapWidth =
+      Math.max(...currentMap.map((row) => row.length)) * TILE_SIZE;
+    const mapHeight = currentMap.length * TILE_SIZE;
+
+    // Handle side boundaries
+    if (this.player.x < TILE_SIZE / 2) {
+      this.player.x = TILE_SIZE / 2;
+      this.player.setVelocityX(0);
+    }
+    if (this.player.x > mapWidth - TILE_SIZE / 2) {
+      this.player.x = mapWidth - TILE_SIZE / 2;
+      this.player.setVelocityX(0);
+    }
+
+    // Death detection - falling out of the bottom
+    if (this.player.y > mapHeight - 10) {
+      this.handlePlayerDeath(currentMap);
+      return;
+    }
+
+    // Portal collision
+    if (
+      this.portal?.visible &&
+      !this.gameState.levelTransitioning &&
+      Phaser.Geom.Intersects.RectangleToRectangle(
+        this.player.getBounds(),
+        this.portal.getBounds()
+      )
+    ) {
+      this.gameState.levelTransitioning = true;
+      this.audioSystem.playSound(SoundType.PORTAL);
+      this.nextLevel();
+    }
+  }
+
+  private handlePlayerDeath(currentMap: string[]): void {
+    this.gameState.lives--;
+
+    // Find player start position
+    for (let row = 0; row < currentMap.length; row++) {
+      for (let col = 0; col < currentMap[row].length; col++) {
+        if (currentMap[row][col] === TileType.PLAYER_START) {
+          const startX = col * TILE_SIZE + TILE_SIZE / 2;
+          const startY = row * TILE_SIZE + TILE_SIZE / 2;
+          this.player.setPosition(startX, startY);
+          break;
+        }
+      }
+    }
+
+    this.player.setVelocity(0, 0);
+    if (this.gameState.lives <= 0) {
+      this.gameOver();
+    }
+  }
+
+  private updateUI(): void {
+    this.scoreText.setText("Score: " + this.gameState.score);
+    this.livesText.setText("Lives: " + this.gameState.lives);
+    this.levelText.setText("Level: " + this.gameState.level);
+  }
+
+  private generateLevel(): void {
+    this.clearLevel();
+    this.gameState.levelTransitioning = false;
+
+    const levelData =
+      LEVEL_MAPS[(this.gameState.level - 1) % LEVEL_MAPS.length];
+    const currentMap = levelData[this.gameState.dimension];
+    this.loadLevelFromMap(currentMap);
+
+    this.setupPhysicsCollisions();
+    this.setupWorldBounds(currentMap);
+  }
+
+  private loadLevelFromMap(mapData: string[]): void {
+    for (let row = 0; row < mapData.length; row++) {
+      const mapRow = mapData[row];
+      for (let col = 0; col < mapRow.length; col++) {
+        const char = mapRow[col];
+        const x = col * TILE_SIZE + TILE_SIZE / 2;
+        const y = row * TILE_SIZE + TILE_SIZE / 2;
+
+        this.createTileObject(char, x, y, row, col);
+      }
+    }
+  }
+
+  private createTileObject(
+    tileType: string,
+    x: number,
+    y: number,
+    row: number,
+    col: number
+  ): void {
+    switch (tileType) {
+      case TileType.PLAYER_START:
+        this.player.setPosition(x, y);
+        this.player.setVelocity(0, 0);
+        break;
+
+      case TileType.PLATFORM:
+        const platform = this.platforms.create(x, y, "platform");
+        platform.refreshBody();
+        break;
+
+      case TileType.COIN:
+        const coinKey = `${this.gameState.level}_${row}_${col}_C`;
+        if (!this.collectedItems.has(coinKey)) {
+          const coin = this.collectibles.create(
+            x,
+            y,
+            "coin"
+          ) as Phaser.Physics.Arcade.Sprite & CollectibleData;
+          coin.mapRow = row;
+          coin.mapCol = col;
+        }
+        break;
+
+      case TileType.POWERUP:
+        const powerupKey = `${this.gameState.level}_${row}_${col}_U`;
+        if (!this.collectedItems.has(powerupKey)) {
+          const powerup = this.powerups.create(
+            x,
+            y,
+            "powerup"
+          ) as Phaser.Physics.Arcade.Sprite & CollectibleData;
+          powerup.mapRow = row;
+          powerup.mapCol = col;
+        }
+        break;
+
+      case TileType.PORTAL:
+        this.portal = this.add.sprite(x, y, "portal");
+        this.portal.setOrigin(0.5, 0.5);
+        this.portalParticles.setPosition(x, y);
+        this.portalParticles.start();
+        break;
+    }
+  }
+
+  private setupPhysicsCollisions(): void {
+    this.physics.add.collider(this.player, this.platforms);
+    this.physics.add.overlap(
+      this.player,
+      this.collectibles,
+      this.collectCoin as any,
+      undefined,
+      this
+    );
+    this.physics.add.overlap(
+      this.player,
+      this.powerups,
+      this.collectPowerup as any,
+      undefined,
+      this
+    );
+  }
+
+  private setupWorldBounds(currentMap: string[]): void {
+    const mapWidth = currentMap[0].length * TILE_SIZE;
+    const mapHeight = currentMap.length * TILE_SIZE;
+
+    this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
+    this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
+    this.cameras.main.setViewport(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+  }
+
+  private collectCoin(
+    _player: Phaser.Physics.Arcade.Sprite,
+    coin: Phaser.Physics.Arcade.Sprite & CollectibleData
+  ): void {
+    const coinKey = `${this.gameState.level}_${coin.mapRow}_${coin.mapCol}_C`;
+    this.collectedItems.add(coinKey);
+
+    this.particles.setPosition(coin.x, coin.y);
+    this.particles.explode(10);
+    coin.destroy();
+
+    this.audioSystem.playSound(SoundType.COIN);
+    this.gameState.score++;
+  }
+
+  private collectPowerup(
+    _player: Phaser.Physics.Arcade.Sprite,
+    powerup: Phaser.Physics.Arcade.Sprite & CollectibleData
+  ): void {
+    const powerupKey = `${this.gameState.level}_${powerup.mapRow}_${powerup.mapCol}_U`;
+    this.collectedItems.add(powerupKey);
+
+    this.particles.setPosition(powerup.x, powerup.y);
+    this.particles.explode(20);
+    powerup.destroy();
+
+    this.audioSystem.playSound(SoundType.POWERUP);
+
+    // Apply speed boost
+    this.gameState.currentPlayerSpeed = 220;
+    this.gameState.currentJumpVelocity = 380;
+
+    // Reset after 5 seconds
+    this.time.delayedCall(5000, () => {
+      this.gameState.currentPlayerSpeed = PLAYER_SPEED;
+      this.gameState.currentJumpVelocity = JUMP_VELOCITY;
+    });
+  }
+
+  private nextLevel(): void {
+    this.gameState.level++;
+    this.gameState.lives++;
+    this.collectedItems.clear();
+
+    const overlay = this.add
+      .rectangle(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 0x000000, 0.7)
+      .setOrigin(0)
+      .setScrollFactor(0);
+
+    const levelText = this.add
+      .text(
+        VIEWPORT_WIDTH / 2,
+        VIEWPORT_HEIGHT / 2 - 20,
+        `Level ${this.gameState.level - 1} Complete!`,
+        { fontSize: "24px", color: "#ffffff" }
+      )
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+
+    this.time.delayedCall(2000, () => {
+      overlay.destroy();
+      levelText.destroy();
+      this.generateLevel();
+    });
+  }
+
+  private gameOver(): void {
+    this.physics.pause();
+
+    this.add
+      .text(VIEWPORT_WIDTH / 2, VIEWPORT_HEIGHT / 2, "GAME OVER", {
+        fontSize: "32px",
+        color: "#ff0000",
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+
+    this.add
+      .text(
+        VIEWPORT_WIDTH / 2,
+        VIEWPORT_HEIGHT / 2 + 40,
+        "Final Score: " + this.gameState.score,
+        { fontSize: "24px", color: "#fff" }
+      )
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+
+    this.add
+      .text(VIEWPORT_WIDTH / 2, VIEWPORT_HEIGHT / 2 + 80, "Click to restart", {
+        fontSize: "18px",
+        color: "#fff",
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+
+    this.input.once("pointerdown", () => {
+      this.scene.restart();
+    });
+  }
+
+  private clearLevel(): void {
+    this.platforms.clear(true, true);
+    this.collectibles.clear(true, true);
+    this.hazards.clear(true, true);
+    this.powerups.clear(true, true);
+    if (this.portal) {
+      this.portal.destroy();
+    }
+  }
+}
