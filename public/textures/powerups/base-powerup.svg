@@ -1,0 +1,80 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+    <!-- Mushroom stem -->
+    <rect x="12" y="20" width="8" height="10" fill="#F5DEB3" />
+    <rect x="10" y="22" width="12" height="8" fill="#F5DEB3" />
+
+    <!-- Stem highlights -->
+    <rect x="12" y="20" width="8" height="1" fill="#FFFACD" />
+    <rect x="10" y="22" width="1" height="8" fill="#FFFACD" />
+    <rect x="12" y="20" width="1" height="10" fill="#FFFACD" />
+
+    <!-- Stem shadows -->
+    <rect x="19" y="20" width="1" height="10" fill="#DEB887" />
+    <rect x="21" y="22" width="1" height="8" fill="#DEB887" />
+    <rect x="10" y="29" width="12" height="1" fill="#DEB887" />
+
+    <!-- Mushroom cap base -->
+    <rect x="4" y="12" width="24" height="12" fill="#FF4500" />
+    <rect x="6" y="8" width="20" height="4" fill="#FF4500" />
+    <rect x="8" y="6" width="16" height="2" fill="#FF4500" />
+    <rect x="10" y="4" width="12" height="2" fill="#FF4500" />
+    <rect x="12" y="2" width="8" height="2" fill="#FF4500" />
+
+    <!-- Cap highlights -->
+    <rect x="4" y="12" width="24" height="1" fill="#FF6347" />
+    <rect x="6" y="8" width="20" height="1" fill="#FF6347" />
+    <rect x="8" y="6" width="16" height="1" fill="#FF6347" />
+    <rect x="10" y="4" width="12" height="1" fill="#FF6347" />
+    <rect x="12" y="2" width="8" height="1" fill="#FF6347" />
+
+    <!-- Cap left highlight -->
+    <rect x="4" y="12" width="1" height="12" fill="#FF6347" />
+    <rect x="6" y="8" width="1" height="4" fill="#FF6347" />
+    <rect x="8" y="6" width="1" height="2" fill="#FF6347" />
+    <rect x="10" y="4" width="1" height="2" fill="#FF6347" />
+    <rect x="12" y="2" width="1" height="2" fill="#FF6347" />
+
+    <!-- Cap shadows -->
+    <rect x="27" y="12" width="1" height="12" fill="#DC143C" />
+    <rect x="25" y="8" width="1" height="4" fill="#DC143C" />
+    <rect x="23" y="6" width="1" height="2" fill="#DC143C" />
+    <rect x="21" y="4" width="1" height="2" fill="#DC143C" />
+    <rect x="19" y="2" width="1" height="2" fill="#DC143C" />
+
+    <!-- White spots on cap -->
+    <rect x="8" y="10" width="4" height="4" fill="#FFFFFF" />
+    <rect x="20" y="10" width="4" height="4" fill="#FFFFFF" />
+    <rect x="14" y="6" width="4" height="4" fill="#FFFFFF" />
+    <rect x="12" y="16" width="3" height="3" fill="#FFFFFF" />
+    <rect x="18" y="18" width="2" height="2" fill="#FFFFFF" />
+    <rect x="10" y="18" width="2" height="2" fill="#FFFFFF" />
+
+    <!-- Spot highlights -->
+    <rect x="8" y="10" width="4" height="1" fill="#F0F0F0" />
+    <rect x="20" y="10" width="4" height="1" fill="#F0F0F0" />
+    <rect x="14" y="6" width="4" height="1" fill="#F0F0F0" />
+    <rect x="12" y="16" width="3" height="1" fill="#F0F0F0" />
+    <rect x="18" y="18" width="2" height="1" fill="#F0F0F0" />
+    <rect x="10" y="18" width="2" height="1" fill="#F0F0F0" />
+
+    <!-- Spot shadows -->
+    <rect x="11" y="13" width="1" height="1" fill="#E0E0E0" />
+    <rect x="23" y="13" width="1" height="1" fill="#E0E0E0" />
+    <rect x="17" y="9" width="1" height="1" fill="#E0E0E0" />
+    <rect x="14" y="18" width="1" height="1" fill="#E0E0E0" />
+    <rect x="19" y="19" width="1" height="1" fill="#E0E0E0" />
+    <rect x="11" y="19" width="1" height="1" fill="#E0E0E0" />
+
+    <!-- Mushroom gills (underside detail) -->
+    <rect x="6" y="22" width="1" height="1" fill="#CD853F" />
+    <rect x="8" y="23" width="1" height="1" fill="#CD853F" />
+    <rect x="10" y="22" width="1" height="1" fill="#CD853F" />
+    <rect x="22" y="22" width="1" height="1" fill="#CD853F" />
+    <rect x="24" y="23" width="1" height="1" fill="#CD853F" />
+    <rect x="26" y="22" width="1" height="1" fill="#CD853F" />
+
+    <!-- Additional texture on stem -->
+    <rect x="14" y="24" width="1" height="1" fill="#DEB887" />
+    <rect x="16" y="26" width="1" height="1" fill="#DEB887" />
+    <rect x="18" y="24" width="1" height="1" fill="#DEB887" />
+</svg>
