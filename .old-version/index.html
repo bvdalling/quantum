@@ -1,0 +1,990 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quantum Jumper - Phaser 3</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: monospace;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        #game-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .instructions {
+            color: white;
+            text-align: center;
+            font-size: clamp(10px, 2.5vw, 14px);
+            margin-bottom: 10px;
+            padding: 0 10px;
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+
+        #mobile-controls {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 999;
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            #mobile-controls {
+                display: block;
+            }
+
+            .instructions {
+                display: none;
+            }
+
+            body {
+                padding: 10px;
+            }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.70.0/phaser.min.js"></script>
+</head>
+
+<body>
+    <div id="game-container">
+        <div class="instructions">
+            Arrow keys or WASD to move, Space to shift dimensions<br />
+            Reach the green portal to advance to the next level!<br />
+        </div>
+        <div id="mobile-controls" style="display: none;"></div>
+    </div>
+    <script>
+        /**
+         * Quantum Jumper - Hackathon Rookie Kit
+         *
+         * Welcome! This code is designed for absolute beginners.
+         * Every function and variable is named for clarity.
+         * You can change things and see what happens!
+         *
+         * ---
+         * HOW TO MOD:
+         * - Change colors, platform positions, or player speed by editing constants.
+         * - Add new features by copying and tweaking small functions.
+         * - Read the comments! They explain what each part does.
+         * 
+         * CREATING NEW LEVELS:
+         * Edit the LEVEL_MAPS array to create new levels!
+         * Each level is a tuple with TWO dimensions: [lightMap, darkMap]
+         * Each character represents a 32x32 tile:
+         * 
+         * P = Player start position
+         * # = Platform (solid ground)
+         * C = Coin (collectible)
+         * U = Powerup (speed boost)
+         * E = Exit portal (goal)
+         * . = Empty space
+         * 
+         * ANTI-FARMING SYSTEM:
+         * Collectibles (coins & powerups) are tracked across dimension shifts.
+         * Once collected in either dimension, they won't respawn when switching back.
+         * This prevents infinite farming by repeatedly switching dimensions.
+         * Tracking resets when advancing to the next level or restarting the game.
+         * 
+         * Example level with both dimensions:
+         * [
+         *   // Light Dimension
+         *   [
+         *     "P........C......E",
+         *     "##................",
+         *     "....U.....######."
+         *   ],
+         *   // Dark Dimension
+         *   [
+         *     "P........U......E",
+         *     "..................",
+         *     "....C.....######."
+         *   ]
+         * ]
+         * ---
+         */
+
+        // === GAME CONSTANTS ===
+        const VIEWPORT_TILES_WIDE = 15;
+        const VIEWPORT_TILES_HIGH = 15;
+        const TILE_SIZE = 32; // All sprites are 32x32 pixels
+        const VIEWPORT_WIDTH = VIEWPORT_TILES_WIDE * TILE_SIZE; // 480 pixels
+        const VIEWPORT_HEIGHT = VIEWPORT_TILES_HIGH * TILE_SIZE; // 480 pixels
+        const PLAYER_SPEED = 180;
+        const JUMP_VELOCITY = 400;
+        const GRAVITY = 800;
+
+        // === LEVEL DATA ===
+        // Each level is a tuple with two dimensions: [lightMap, darkMap]
+        // The viewport is 15x15 tiles, but levels can be much larger!
+        // P = Player start, # = Platform, C = Coin, U = Powerup, E = Portal (Exit), . = Empty
+        const LEVEL_MAPS = [
+            // Level 1 - Tutorial (24x15 - wider than viewport)
+            [
+                // Light Dimension
+                [
+                    "........................",
+                    "........................",
+                    "........................",
+                    "......C.......C.........",
+                    "....#####...#####.......",
+                    "........................",
+                    "P...#....U....#....U....",
+                    "###.........###.........",
+                    "........................",
+                    ".....###.......###......",
+                    "........................",
+                    "...........C...........E",
+                    "........#######.........",
+                    "........................",
+                ],
+                // Dark Dimension
+                [
+                    "........................",
+                    "........................",
+                    "......U.......U.........",
+                    "....#####...#####.......",
+                    "........................",
+                    "........................",
+                    "P...#....C....#....C....",
+                    "###.........###.........",
+                    "........................",
+                    "........................",
+                    "...###.......###........",
+                    "........................",
+                    "........#######.........",
+                    ".......................E",
+                    "########################"
+                ]
+            ],
+            // Level 2 - Jumping Practice (30x15 - much wider)
+            [
+                // Light Dimension
+                [
+                    "..............................",
+                    "..............................",
+                    "....C.....C.....C.....C.......",
+                    "..###...###...###...###.......",
+                    "..............................",
+                    "P.........................E...",
+                    "##..........................##",
+                    "..............................",
+                    "..U.......U.......U.......U...",
+                    ".###.....###.....###.....###..",
+                    "..............................",
+                    "..............................",
+                    "..............................",
+                    "..............................",
+                    "##############################"
+                ],
+                // Dark Dimension
+                [
+                    "..............................",
+                    "....U.....U.....U.....U.......",
+                    "..###...###...###...###.......",
+                    "..............................",
+                    "..............................",
+                    "P.........................E...",
+                    "##..........................##",
+                    "..............................",
+                    "..C.......C.......C.......C...",
+                    "..............................",
+                    ".###.....###.....###.....###..",
+                    "..............................",
+                    "..............................",
+                    "..............................",
+                    "##############################"
+                ]
+            ],
+            // Level 3 - Challenge (28x15 - exploration level)
+            [
+                // Light Dimension
+                [
+                    "............................",
+                    "......C...........C.........",
+                    "....#####.......#####.......",
+                    "............................",
+                    "P.....U.........U...........",
+                    "###.........................",
+                    "............................",
+                    "...C.....C.....C.....C......",
+                    ".###...####...###...####....",
+                    "............................",
+                    "............................",
+                    "............................",
+                    "...........................E",
+                    ".......................####.",
+                    "############################"
+                ],
+                // Dark Dimension
+                [
+                    "............................",
+                    "......U...........U.........",
+                    "............................",
+                    "....#####.......#####.......",
+                    "P...........................",
+                    "###.........................",
+                    "............................",
+                    "...U.....U.....U.....U......",
+                    "............................",
+                    ".###...####...###...####....",
+                    "............................",
+                    "............................",
+                    "...........................E",
+                    ".......................####.",
+                    "############################"
+                ]
+            ]
+        ];
+
+        // === MAIN GAME SCENE ===
+        class QuantumJumper extends Phaser.Scene {
+            constructor() {
+                super({ key: "GameScene" });
+            }
+
+            preload() {
+                this.createTextures();
+            }
+
+            create() {
+                // --- Game State ---
+                this.level = 1;
+                this.score = 0;
+                this.lives = 3;
+                this.dimension = 0; // 0 = light, 1 = dark
+                this.levelTransitioning = false;
+                this.speedBoostActive = false;
+                this.jumpBoostActive = false;
+                this.currentPlayerSpeed = PLAYER_SPEED;
+                this.currentJumpVelocity = JUMP_VELOCITY;
+
+                // Track collected items across dimension shifts
+                // Key format: "level_row_col_type" (e.g., "1_5_3_C" for coin at row 5, col 3 in level 1)
+                this.collectedItems = new Set();
+
+                this.setupAudio();
+                this.createBackground();
+                this.createPlayer();
+                this.createGroups();
+                this.createParticles();
+                this.createUI();
+                // Initialize mobile input state for touch controls
+                this.mobileInput = { left: false, right: false };
+                this.setupInput();
+                this.generateLevel();
+                this.setupCamera();
+            }
+
+            // === TEXTURE CREATION ===
+            createTextures() {
+                // Create 32x32 pixelmap textures
+                this.createPlayerTexture();
+                this.createPlatformTexture();
+                this.createCoinTexture();
+                this.createPowerupTexture();
+                this.createPortalTexture();
+                this.createParticleTextures();
+            }
+
+            createPlayerTexture() {
+                // Player - 32x32 white character with detailed face
+                const graphics = this.add.graphics();
+                graphics.fillStyle(0xffffff);
+                graphics.fillRect(0, 0, 32, 32);
+
+                // Face details
+                graphics.fillStyle(0x000000);
+                // Eyes
+                graphics.fillRect(8, 8, 4, 4);   // Left eye
+                graphics.fillRect(20, 8, 4, 4);  // Right eye
+                // Mouth
+                graphics.fillRect(10, 20, 12, 2); // Mouth
+                // Nose
+                graphics.fillRect(15, 15, 2, 3);  // Nose
+
+                graphics.generateTexture("player", 32, 32);
+                graphics.destroy();
+            }
+
+            createPlatformTexture() {
+                // Platform - 32x32 green block with texture
+                const graphics = this.add.graphics();
+                graphics.fillStyle(0x228B22); // Forest green
+                graphics.fillRect(0, 0, 32, 32);
+
+                // Add texture pattern
+                graphics.fillStyle(0x32CD32); // Lime green highlights
+                graphics.fillRect(2, 2, 28, 4);
+                graphics.fillRect(2, 8, 4, 24);
+                graphics.fillRect(26, 8, 4, 24);
+                graphics.fillRect(8, 26, 16, 4);
+
+                // Dark outlines
+                graphics.fillStyle(0x006400); // Dark green
+                graphics.fillRect(0, 0, 32, 2);   // Top
+                graphics.fillRect(0, 30, 32, 2);  // Bottom
+                graphics.fillRect(0, 0, 2, 32);   // Left
+                graphics.fillRect(30, 0, 2, 32);  // Right
+
+                graphics.generateTexture("platform", 32, 32);
+                graphics.destroy();
+            }
+
+            createCoinTexture() {
+                // Coin - 32x32 golden coin with details
+                const graphics = this.add.graphics();
+                graphics.fillStyle(0xFFD700); // Gold
+                graphics.fillCircle(16, 16, 14);
+
+                // Inner circle
+                graphics.fillStyle(0xFFA500); // Orange gold
+                graphics.fillCircle(16, 16, 10);
+
+                // Center highlight
+                graphics.fillStyle(0xFFFF00); // Bright yellow
+                graphics.fillCircle(16, 16, 6);
+
+                // Dollar sign or star pattern
+                graphics.fillStyle(0xFFD700);
+                graphics.fillRect(14, 8, 4, 16);  // Vertical line
+                graphics.fillRect(10, 12, 12, 3); // Horizontal top
+                graphics.fillRect(10, 17, 12, 3); // Horizontal bottom
+
+                graphics.generateTexture("coin", 32, 32);
+                graphics.destroy();
+            }
+
+            createPowerupTexture() {
+                // Powerup - 32x32 purple crystal with sparkles
+                const graphics = this.add.graphics();
+                graphics.fillStyle(0x9932CC); // Purple
+                graphics.fillRect(8, 4, 16, 24);  // Main crystal
+                graphics.fillRect(4, 8, 24, 16);  // Cross shape
+
+                // Crystal facets
+                graphics.fillStyle(0xBA55D3); // Medium orchid
+                graphics.fillRect(10, 6, 12, 20);
+                graphics.fillRect(6, 10, 20, 12);
+
+                // Bright highlights
+                graphics.fillStyle(0xFFFFFF); // White sparkles
+                graphics.fillRect(12, 8, 2, 2);
+                graphics.fillRect(18, 12, 2, 2);
+                graphics.fillRect(14, 18, 2, 2);
+                graphics.fillRect(20, 20, 2, 2);
+                graphics.fillRect(10, 22, 2, 2);
+
+                graphics.generateTexture("powerup", 32, 32);
+                graphics.destroy();
+            }
+
+            createPortalTexture() {
+                // Portal - 32x32 swirling green vortex
+                const graphics = this.add.graphics();
+                graphics.fillStyle(0x00FF00); // Bright green
+                graphics.fillRect(0, 0, 32, 32);
+
+                // Swirl pattern
+                graphics.fillStyle(0x32CD32); // Lime green
+                graphics.fillCircle(16, 16, 12);
+
+                graphics.fillStyle(0x00FF00);
+                graphics.fillCircle(16, 16, 8);
+
+                graphics.fillStyle(0x90EE90); // Light green
+                graphics.fillCircle(16, 16, 4);
+
+                // Spiral effect
+                graphics.fillStyle(0x006400); // Dark green
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const x = 16 + Math.cos(angle) * 10;
+                    const y = 16 + Math.sin(angle) * 10;
+                    graphics.fillRect(x, y, 2, 2);
+                }
+
+                graphics.generateTexture("portal", 32, 32);
+                graphics.destroy();
+            }
+
+            createParticleTextures() {
+                // Particle texture - 4x4 white square
+                const particle = this.add.graphics();
+                particle.fillStyle(0xffffff);
+                particle.fillRect(0, 0, 4, 4);
+                particle.generateTexture("particle", 4, 4);
+                particle.destroy();
+
+                // Portal particle texture - 3x3 green square
+                const portalParticle = this.add.graphics();
+                portalParticle.fillStyle(0x00ff00);
+                portalParticle.fillRect(0, 0, 3, 3);
+                portalParticle.generateTexture("portal_particle", 3, 3);
+                portalParticle.destroy();
+            }
+
+            // === AUDIO SETUP ===
+            setupAudio() {
+                this.audioContext = null;
+                this.audioInitialized = false;
+                this.sounds = {};
+
+                // Initialize audio context on first user interaction
+                this.input.once('pointerdown', this.initializeAudio, this);
+                this.input.keyboard.once('keydown', this.initializeAudio, this);
+            }
+
+            initializeAudio() {
+                if (this.audioInitialized) return;
+
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    this.audioInitialized = true;
+                    console.log("Audio initialized successfully! 🔊");
+                } catch (error) {
+                    console.warn("Audio not supported:", error);
+                }
+            }
+
+            // === SOUND GENERATION ===
+            playSound(type, frequency = 440, duration = 0.2, volume = 0.1) {
+                if (!this.audioContext) return;
+
+                try {
+                    const oscillator = this.audioContext.createOscillator();
+                    const gainNode = this.audioContext.createGain();
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(this.audioContext.destination);
+
+                    // Different sound types
+                    switch (type) {
+                        case 'jump':
+                            oscillator.type = 'square';
+                            oscillator.frequency.setValueAtTime(300, this.audioContext.currentTime);
+                            oscillator.frequency.exponentialRampToValueAtTime(500, this.audioContext.currentTime + 0.1);
+                            break;
+                        case 'coin':
+                            oscillator.type = 'sine';
+                            oscillator.frequency.setValueAtTime(523, this.audioContext.currentTime); // C5
+                            oscillator.frequency.setValueAtTime(659, this.audioContext.currentTime + 0.1); // E5
+                            oscillator.frequency.setValueAtTime(784, this.audioContext.currentTime + 0.2); // G5
+                            break;
+                        case 'powerup':
+                            oscillator.type = 'sawtooth';
+                            oscillator.frequency.setValueAtTime(200, this.audioContext.currentTime);
+                            oscillator.frequency.exponentialRampToValueAtTime(800, this.audioContext.currentTime + 0.3);
+                            duration = 0.4;
+                            volume = 0.15;
+                            break;
+                        case 'portal':
+                            oscillator.type = 'sine';
+                            oscillator.frequency.setValueAtTime(100, this.audioContext.currentTime);
+                            oscillator.frequency.exponentialRampToValueAtTime(1000, this.audioContext.currentTime + 0.5);
+                            duration = 0.6;
+                            volume = 0.12;
+                            break;
+                        case 'dimension':
+                            oscillator.type = 'triangle';
+                            oscillator.frequency.setValueAtTime(880, this.audioContext.currentTime);
+                            oscillator.frequency.exponentialRampToValueAtTime(220, this.audioContext.currentTime + 0.3);
+                            duration = 0.4;
+                            volume = 0.08;
+                            break;
+                        default:
+                            oscillator.type = 'sine';
+                            oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
+                    }
+
+                    // Volume envelope
+                    gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+                    gainNode.gain.linearRampToValueAtTime(volume, this.audioContext.currentTime + 0.01);
+                    gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + duration);
+
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + duration);
+                } catch (error) {
+                    console.warn("Error playing sound:", error);
+                }
+            }
+
+            // === PHYSICS WORLD ===
+            setupPhysicsWorld() {
+                // Physics world bounds are now set dynamically in generateLevel()
+            }
+
+            // === BACKGROUND ===
+            createBackground() {
+                // Background should be large enough to cover the entire world
+                this.background = this.add.rectangle(
+                    0, 0,
+                    5000, // Large enough for any level
+                    VIEWPORT_HEIGHT,
+                    0x87ceeb
+                );
+                this.background.setOrigin(0, 0);
+                this.background.setScrollFactor(0.1);
+            }
+
+            // === PLAYER ===
+            createPlayer() {
+                // Player will be positioned when level loads
+                this.player = this.physics.add.sprite(0, 0, "player");
+                this.player.setBounce(0);
+                // Don't collide with world bounds - we'll handle side collisions manually
+                this.player.setCollideWorldBounds(false);
+                this.player.jumpState = "none";
+                this.player.animationState = "standing";
+            }
+
+            // === GROUPS ===
+            createGroups() {
+                this.platforms = this.physics.add.staticGroup();
+                this.collectibles = this.physics.add.staticGroup();
+                this.hazards = this.add.group();
+                this.powerups = this.physics.add.staticGroup();
+            }
+
+            // === PARTICLES ===
+            createParticles() {
+                this.particles = this.add.particles(0, 0, "particle", {
+                    speed: { min: 50, max: 150 },
+                    scale: { start: 1, end: 0 },
+                    lifespan: 600,
+                    emitting: false,
+                });
+
+                // Portal particles for portal effect
+                this.portalParticles = this.add.particles(0, 0, "portal_particle", {
+                    speed: { min: 40, max: 100 },
+                    angle: { min: 0, max: 360 },
+                    scale: { start: 1, end: 0 },
+                    lifespan: 800,
+                    emitting: false,
+                    quantity: 2,
+                    frequency: 100,
+                    alpha: { start: 1, end: 0 },
+                    blendMode: 'ADD',
+                });
+            }
+
+            // === UI ===
+            createUI() {
+                this.scoreText = this.add.text(16, 16, "Score: 0", { fontSize: "18px", fill: "#fff" }).setScrollFactor(0);
+                this.livesText = this.add.text(16, 40, "Lives: 3", { fontSize: "18px", fill: "#fff" }).setScrollFactor(0);
+                this.dimensionText = this.add.text(16, 64, "Dimension: Light", { fontSize: "18px", fill: "#5f5fff" }).setScrollFactor(0);
+                this.levelText = this.add.text(VIEWPORT_WIDTH - 120, 16, "Level: 1", { fontSize: "18px", fill: "#fff" }).setScrollFactor(0);
+            }
+
+            // === INPUT ===
+            setupInput() {
+                this.cursors = this.input.keyboard.createCursorKeys();
+                this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+                this.wasd = this.input.keyboard.addKeys("W,S,A,D");
+            }
+
+            // === CAMERA ===
+            setupCamera() {
+                // Camera bounds will be set dynamically in generateLevel()
+                this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+            }
+
+            // === LEVEL GENERATION ===
+            generateLevel() {
+                this.clearLevel();
+                this.levelTransitioning = false;
+
+                // Get current level map (loop back to level 1 if we exceed available levels)
+                const levelData = LEVEL_MAPS[(this.level - 1) % LEVEL_MAPS.length];
+                const currentMap = levelData[this.dimension]; // Use current dimension (0 = light, 1 = dark)
+                this.loadLevelFromMap(currentMap);
+
+                // Setup physics collisions
+                this.physics.add.collider(this.player, this.platforms);
+                // Static collectibles and powerups don't need platform collisions
+                this.physics.add.overlap(this.player, this.collectibles, this.collectCoin, null, this);
+                this.physics.add.overlap(this.player, this.powerups, this.collectPowerup, null, this);
+
+                // Set world bounds based on actual map size
+                const mapWidth = currentMap[0].length * TILE_SIZE;
+                const mapHeight = currentMap.length * TILE_SIZE;
+                this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
+
+                // Set camera bounds to follow player within the world
+                this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
+                this.cameras.main.setViewport(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+            }
+
+            loadLevelFromMap(mapData) {
+                // Parse the text-based level format
+                for (let row = 0; row < mapData.length; row++) {
+                    const mapRow = mapData[row];
+                    for (let col = 0; col < mapRow.length; col++) {
+                        const char = mapRow[col];
+                        const x = col * TILE_SIZE + TILE_SIZE / 2; // Center of tile
+                        const y = row * TILE_SIZE + TILE_SIZE / 2; // Center of tile
+
+                        switch (char) {
+                            case 'P': // Player start position
+                                this.player.setPosition(x, y);
+                                this.player.setVelocity(0, 0);
+                                break;
+
+                            case '#': // Platform
+                                const platform = this.platforms.create(x, y, "platform");
+                                platform.refreshBody();
+                                break;
+
+                            case 'C': // Coin
+                                // Check if this coin was already collected
+                                const coinKey = `${this.level}_${row}_${col}_C`;
+                                if (!this.collectedItems.has(coinKey)) {
+                                    const coin = this.collectibles.create(x, y, "coin");
+                                    // Store position data for tracking
+                                    coin.mapRow = row;
+                                    coin.mapCol = col;
+                                }
+                                break;
+
+                            case 'U': // Powerup
+                                // Check if this powerup was already collected
+                                const powerupKey = `${this.level}_${row}_${col}_U`;
+                                if (!this.collectedItems.has(powerupKey)) {
+                                    const powerup = this.powerups.create(x, y, "powerup");
+                                    // Store position data for tracking
+                                    powerup.mapRow = row;
+                                    powerup.mapCol = col;
+                                }
+                                break;
+
+                            case 'E': // Exit portal
+                                this.portal = this.add.sprite(x, y, "portal");
+                                this.portal.setOrigin(0.5, 0.5);
+                                // Start portal particles
+                                this.portalParticles.setPosition(x, y);
+                                this.portalParticles.start();
+                                break;
+
+                            case '.': // Empty space
+                            default:
+                                // Do nothing for empty space or unknown characters
+                                break;
+                        }
+                    }
+                }
+            }
+
+            // === COLLISION HANDLERS ===
+            collectCoin(player, coin) {
+                // Record that this coin was collected
+                const coinKey = `${this.level}_${coin.mapRow}_${coin.mapCol}_C`;
+                this.collectedItems.add(coinKey);
+
+                // Add sparkle effect at coin position
+                this.particles.setPosition(coin.x, coin.y);
+                this.particles.explode(10);
+
+                // Remove the coin
+                coin.destroy();
+
+                // Play coin sound
+                this.playSound('coin');
+
+                // Increment score by 1
+                this.score++;
+                console.log("Coin collected! Score: " + this.score);
+            }
+
+            collectPowerup(player, powerup) {
+                // Record that this powerup was collected
+                const powerupKey = `${this.level}_${powerup.mapRow}_${powerup.mapCol}_U`;
+                this.collectedItems.add(powerupKey);
+
+                // Add bigger sparkle effect at powerup position
+                this.particles.setPosition(powerup.x, powerup.y);
+                this.particles.explode(20);
+
+                // Remove the powerup
+                powerup.destroy();
+
+                // Play powerup sound
+                this.playSound('powerup');
+
+                // Temporary speed boost
+                this.currentPlayerSpeed = 220;
+                this.currentJumpVelocity = 380;
+
+                // Reset speed after 5 seconds
+                this.time.delayedCall(5000, () => {
+                    this.currentPlayerSpeed = PLAYER_SPEED;
+                    this.currentJumpVelocity = JUMP_VELOCITY;
+                });
+
+                console.log("Powerup collected! Speed boost activated! 🚀");
+            }
+
+            // === GAME LOOP ===
+            update() {
+                if (!this.player || !this.player.body) return;
+                this.handlePlayerMovement();
+                this.handlePlayerJump();
+                this.handleDimensionShift();
+                this.handleCollisions();
+                this.updateUI();
+            }
+
+            handlePlayerMovement() {
+                if (this.cursors.left.isDown || this.wasd.A.isDown || this.mobileInput.left) {
+                    this.player.setVelocityX(-this.currentPlayerSpeed);
+                } else if (this.cursors.right.isDown || this.wasd.D.isDown || this.mobileInput.right) {
+                    this.player.setVelocityX(this.currentPlayerSpeed);
+                } else {
+                    this.player.setVelocityX(0);
+                }
+            }
+
+            handlePlayerJump() {
+                const isOnGround = this.player.body.touching.down;
+                if ((this.cursors.up.isDown || this.wasd.W.isDown) && isOnGround) {
+                    this.player.setVelocityY(-this.currentJumpVelocity);
+                    this.player.jumpState = "rising";
+                    this.playSound('jump'); // Play jump sound
+                }
+            }
+
+            handleDimensionShift() {
+                if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+                    // Store player position before dimension shift
+                    const playerX = this.player.x;
+                    const playerY = this.player.y;
+                    const playerVelX = this.player.body.velocity.x;
+                    const playerVelY = this.player.body.velocity.y;
+
+                    this.dimension = 1 - this.dimension;
+                    this.dimensionText.setText(
+                        "Dimension: " + (this.dimension === 0 ? "Light" : "Dark")
+                    );
+                    this.dimensionText.setFill(
+                        this.dimension === 0 ? "#5f5fff" : "#ff5f5f"
+                    );
+                    this.particles.emitParticleAt(this.player.x, this.player.y, 20);
+
+                    // Play dimension shift sound
+                    this.playSound('dimension');
+
+                    // Reload the level with the new dimension
+                    this.clearLevel();
+                    const levelData = LEVEL_MAPS[(this.level - 1) % LEVEL_MAPS.length];
+                    const currentMap = levelData[this.dimension];
+                    this.loadLevelFromMap(currentMap);
+
+                    // Restore player position and velocity (but find player start if needed)
+                    this.player.setPosition(playerX, playerY);
+                    this.player.setVelocity(playerVelX, playerVelY);
+
+                    // Re-setup physics collisions
+                    this.physics.add.collider(this.player, this.platforms);
+                    // Static collectibles and powerups don't need platform collisions
+                    this.physics.add.overlap(this.player, this.collectibles, this.collectCoin, null, this);
+                    this.physics.add.overlap(this.player, this.powerups, this.collectPowerup, null, this);
+                }
+            }
+
+            handleCollisions() {
+                // Death check - use the current level's actual height
+                const levelData = LEVEL_MAPS[(this.level - 1) % LEVEL_MAPS.length];
+                const currentMap = levelData[this.dimension];
+                const mapWidth = Math.max(...currentMap.map(row => row.length)) * TILE_SIZE;
+                const mapHeight = currentMap.length * TILE_SIZE;
+
+                // Handle side boundaries (prevent player from going outside left/right edges)
+                if (this.player.x < TILE_SIZE / 2) {
+                    this.player.x = TILE_SIZE / 2;
+                    this.player.setVelocityX(0);
+                }
+                if (this.player.x > mapWidth - TILE_SIZE / 2) {
+                    this.player.x = mapWidth - TILE_SIZE / 2;
+                    this.player.setVelocityX(0);
+                }
+
+                // Death detection - falling out of the bottom of the world
+                if (this.player.y > mapHeight - 10) {
+                    this.lives--;
+                    // Find player start position in current dimension
+
+                    // Find 'P' position in current map
+                    for (let row = 0; row < currentMap.length; row++) {
+                        for (let col = 0; col < currentMap[row].length; col++) {
+                            if (currentMap[row][col] === 'P') {
+                                const startX = col * TILE_SIZE + TILE_SIZE / 2;
+                                const startY = row * TILE_SIZE + TILE_SIZE / 2;
+                                this.player.setPosition(startX, startY);
+                                break;
+                            }
+                        }
+                    }
+
+                    this.player.setVelocity(0, 0);
+                    if (this.lives <= 0) {
+                        this.gameOver();
+                    }
+                    return;
+                }
+
+                // Portal collision
+                if (
+                    this.portal &&
+                    this.portal.visible &&
+                    !this.levelTransitioning &&
+                    Phaser.Geom.Intersects.RectangleToRectangle(
+                        this.player.getBounds(),
+                        this.portal.getBounds()
+                    )
+                ) {
+                    this.levelTransitioning = true;
+                    this.playSound('portal'); // Play portal sound
+                    this.nextLevel();
+                }
+            }
+
+            updateUI() {
+                this.scoreText.setText("Score: " + this.score);
+                this.livesText.setText("Lives: " + this.lives);
+                this.levelText.setText("Level: " + this.level);
+            }
+
+            // === LEVEL COMPLETION ===
+            nextLevel() {
+                this.level++;
+                this.lives++;
+
+                // Clear collected items tracking for the new level
+                this.collectedItems.clear();
+
+                const overlay = this.add
+                    .rectangle(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 0x000000, 0.7)
+                    .setOrigin(0)
+                    .setScrollFactor(0);
+
+                const levelText = this.add
+                    .text(
+                        VIEWPORT_WIDTH / 2,
+                        VIEWPORT_HEIGHT / 2 - 20,
+                        `Level ${this.level - 1} Complete!`,
+                        { fontSize: "24px", fill: "#ffffff" }
+                    )
+                    .setOrigin(0.5)
+                    .setScrollFactor(0);
+
+                this.time.delayedCall(2000, () => {
+                    overlay.destroy();
+                    levelText.destroy();
+                    this.generateLevel();
+                });
+            }
+
+            // === GAME OVER ===
+            gameOver() {
+                this.physics.pause();
+
+                const gameOverText = this.add
+                    .text(VIEWPORT_WIDTH / 2, VIEWPORT_HEIGHT / 2, "GAME OVER", {
+                        fontSize: "32px",
+                        fill: "#ff0000",
+                    })
+                    .setOrigin(0.5)
+                    .setScrollFactor(0);
+
+                const finalScoreText = this.add
+                    .text(
+                        VIEWPORT_WIDTH / 2,
+                        VIEWPORT_HEIGHT / 2 + 40,
+                        "Final Score: " + this.score,
+                        { fontSize: "24px", fill: "#fff" }
+                    )
+                    .setOrigin(0.5)
+                    .setScrollFactor(0);
+
+                const restartText = this.add
+                    .text(
+                        VIEWPORT_WIDTH / 2,
+                        VIEWPORT_HEIGHT / 2 + 80,
+                        "Click to restart",
+                        { fontSize: "18px", fill: "#fff" }
+                    )
+                    .setOrigin(0.5)
+                    .setScrollFactor(0);
+
+                this.input.once("pointerdown", () => {
+                    this.scene.restart();
+                });
+            }
+
+            clearLevel() {
+                this.platforms.clear(true, true);
+                this.collectibles.clear(true, true);
+                this.hazards.clear(true, true);
+                this.powerups.clear(true, true);
+                if (this.portal) {
+                    this.portal.destroy();
+                    this.portal = null;
+                }
+            }
+        }
+
+        // === PHASER GAME CONFIG ===
+        const config = {
+            type: Phaser.AUTO,
+            width: VIEWPORT_WIDTH,  // 480 pixels (15x32)
+            height: VIEWPORT_HEIGHT, // 480 pixels (15x32)
+            parent: 'game-container',
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: GRAVITY },
+                    debug: false
+                }
+            },
+            scene: QuantumJumper,
+            backgroundColor: '#87CEEB',
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH
+            },
+            render: {
+                antialias: false,
+                pixelArt: true
+            }
+        };
+        const game = new Phaser.Game(config);
+    </script>
+</body>
+
+</html>
