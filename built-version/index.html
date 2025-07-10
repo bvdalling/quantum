@@ -28,21 +28,8 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      width: 100vw;
-      height: 100vh;
-    }
-
-    .instructions {
-      color: white;
-      text-align: center;
-      font-size: clamp(10px, 2.5vw, 14px);
-      margin-bottom: 10px;
-      padding: 0 10px;
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 10;
+      width: 480px;
+      height: 480px;
     }
 
     #mobile-controls {
@@ -74,10 +61,6 @@
 
 <body>
   <div id="game-container">
-    <div class="instructions">
-      Arrow keys or WASD to move, Space to shift dimensions<br />
-      Reach the green portal to advance to the next level!<br />
-    </div>
     <div id="mobile-controls" style="display: none;"></div>
   </div>
   <script type="module" src="/src/main.ts"></script>

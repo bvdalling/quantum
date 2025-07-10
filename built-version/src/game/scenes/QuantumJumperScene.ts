@@ -73,6 +73,11 @@ export class QuantumJumperScene extends Phaser.Scene {
     super({ key: "QuantumJumperScene" });
   }
 
+  init(data: { level?: number; isFromLoading?: boolean }): void {
+    // Store initialization data to use in create method
+    this.registry.set("initData", data);
+  }
+
   preload(): void {
     // Initialize texture generator and load SVG assets
     this.textureGenerator = new TextureGenerator(this);
@@ -95,18 +100,32 @@ export class QuantumJumperScene extends Phaser.Scene {
   }
 
   private initializeGameState(): void {
-    this.gameState = {
-      level: 1,
-      score: 0,
-      lives: 3,
-      dimension: Dimension.LIGHT,
-      levelTransitioning: false,
-      speedBoostActive: false,
-      jumpBoostActive: false,
-      invincibilityActive: false,
-      currentPlayerSpeed: PLAYER_SPEED,
-      currentJumpVelocity: JUMP_VELOCITY,
-    };
+    // Get initialization data from registry
+    const initData = this.registry.get("initData") || {};
+
+    // Check if we're restoring from loading screen
+    if (initData.isFromLoading) {
+      const savedState = this.registry.get("gameState");
+      if (savedState) {
+        this.gameState = savedState;
+        // Update level if specified
+        if (initData.level) {
+          this.gameState.level = initData.level;
+        }
+      } else {
+        // Fallback to default state
+        this.createDefaultGameState();
+        if (initData.level) {
+          this.gameState.level = initData.level;
+        }
+      }
+    } else {
+      // Create new game state
+      this.createDefaultGameState();
+      if (initData.level) {
+        this.gameState.level = initData.level;
+      }
+    }
 
     this.playerState = {
       jumpState: JumpState.NONE,
@@ -119,6 +138,24 @@ export class QuantumJumperScene extends Phaser.Scene {
 
     this.mobileInput = { left: false, right: false };
     this.collectedItems = new Set<string>();
+
+    // Clear the init data from registry
+    this.registry.remove("initData");
+  }
+
+  private createDefaultGameState(): void {
+    this.gameState = {
+      level: 1,
+      score: 0,
+      lives: 3,
+      dimension: Dimension.LIGHT,
+      levelTransitioning: false,
+      speedBoostActive: false,
+      jumpBoostActive: false,
+      invincibilityActive: false,
+      currentPlayerSpeed: PLAYER_SPEED,
+      currentJumpVelocity: JUMP_VELOCITY,
+    };
   }
 
   private initializeSystems(): void {
@@ -509,10 +546,97 @@ export class QuantumJumperScene extends Phaser.Scene {
     const levelData =
       LEVEL_MAPS[(this.gameState.level - 1) % LEVEL_MAPS.length];
     const currentMap = levelData[this.gameState.dimension];
-    this.loadLevelFromMap(currentMap);
+
+    // Try to use pre-baked level data for better performance
+    const cacheKey = `level_${(this.gameState.level - 1) % LEVEL_MAPS.length}_${
+      this.gameState.dimension === Dimension.LIGHT ? "light" : "dark"
+    }`;
+
+    if (this.useCachedLevel(cacheKey)) {
+      console.log(`Using pre-baked data for ${cacheKey}`);
+    } else {
+      console.log(`Falling back to runtime generation for ${cacheKey}`);
+      this.loadLevelFromMap(currentMap);
+    }
 
     this.setupPhysicsCollisions();
     this.setupWorldBounds(currentMap);
+  }
+
+  private useCachedLevel(cacheKey: string): boolean {
+    const cachedData = this.registry.get(cacheKey);
+    if (!cachedData) {
+      return false;
+    }
+
+    // Create platforms from cached data
+    cachedData.platforms.forEach((pos: { x: number; y: number }) => {
+      const platform = this.platforms.create(pos.x, pos.y, "platform");
+      platform.refreshBody();
+    });
+
+    // Create collectibles from cached data
+    cachedData.collectibles.forEach(
+      (item: { x: number; y: number; type: TileType }) => {
+        const collectibleKey = `${this.gameState.level}_${Math.floor(
+          (item.y - 16) / 32
+        )}_${Math.floor((item.x - 16) / 32)}_${item.type}`;
+        if (!this.collectedItems.has(collectibleKey)) {
+          const textureKey = TextureGenerator.getTextureKey(item.type);
+          const collectible = this.collectibles.create(
+            item.x,
+            item.y,
+            textureKey
+          ) as Phaser.Physics.Arcade.Sprite & CollectibleData;
+          collectible.mapRow = Math.floor((item.y - 16) / 32);
+          collectible.mapCol = Math.floor((item.x - 16) / 32);
+          collectible.tileType = item.type;
+        }
+      }
+    );
+
+    // Create powerups from cached data
+    cachedData.powerups.forEach(
+      (item: { x: number; y: number; type: TileType }) => {
+        const powerupKey = `${this.gameState.level}_${Math.floor(
+          (item.y - 16) / 32
+        )}_${Math.floor((item.x - 16) / 32)}_${item.type}`;
+        if (!this.collectedItems.has(powerupKey)) {
+          const textureKey = TextureGenerator.getTextureKey(item.type);
+          const powerup = this.powerups.create(
+            item.x,
+            item.y,
+            textureKey
+          ) as Phaser.Physics.Arcade.Sprite & CollectibleData;
+          powerup.mapRow = Math.floor((item.y - 16) / 32);
+          powerup.mapCol = Math.floor((item.x - 16) / 32);
+          powerup.tileType = item.type;
+        }
+      }
+    );
+
+    // Set player position
+    if (cachedData.player) {
+      this.player.setPosition(cachedData.player.x, cachedData.player.y);
+      this.player.setVelocity(0, 0);
+    }
+
+    // Create portal
+    if (cachedData.portal) {
+      this.portal = this.add.sprite(
+        cachedData.portal.x,
+        cachedData.portal.y,
+        "portal"
+      );
+      this.portal.setOrigin(0.5, 0.5);
+      this.portalParticles.setPosition(
+        cachedData.portal.x,
+        cachedData.portal.y
+      );
+      this.portalParticles.start();
+    }
+
+    return true;
   }
 
   private loadLevelFromMap(mapData: string[]): void {
@@ -730,10 +854,25 @@ export class QuantumJumperScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setScrollFactor(0);
 
+    const nextLevelText = this.add
+      .text(
+        VIEWPORT_WIDTH / 2,
+        VIEWPORT_HEIGHT / 2 + 20,
+        `Preparing Level ${this.gameState.level}...`,
+        { fontSize: "16px", color: "#87ceeb" }
+      )
+      .setOrigin(0.5)
+      .setScrollFactor(0);
+
     this.time.delayedCall(2000, () => {
-      overlay.destroy();
-      levelText.destroy();
-      this.generateLevel();
+      // Save current game state to registry
+      this.registry.set("gameState", this.gameState);
+
+      // Transition to loading screen for next level
+      this.scene.start("LoadingScene", {
+        level: this.gameState.level,
+        isInitialLoad: false,
+      });
     });
   }
 

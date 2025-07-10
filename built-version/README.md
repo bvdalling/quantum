@@ -4,8 +4,13 @@ A dimension-shifting platformer game built with Phaser 3, TypeScript, and Vite.
 
 ## 🎮 Game Features
 
+- **Start Screen**: Welcome screen with instructions and game information
+- **Optimized Loading**: Pre-baked level data for smooth gameplay performance
 - **Dual Dimensions**: Switch between light and dark dimensions with unique layouts
-- **Platform Gameplay**: Classic jumping and collecting mechanics
+- **Platform Gameplay**: Classic jumping and collecting mechanics with Mario-style physics
+- **Coin & Powerup Variants**: Bronze, Silver, Gold, and Ruby coins with different values
+- **Multiple Powerups**: Mushrooms, 1-UPs, Fire Flowers, Stars, Speed Boosts, and Poison
+- **Player Animations**: Walking, jumping, and falling animations
 - **Anti-Farming System**: Prevents infinite collectible farming across dimensions
 - **Modular Architecture**: Clean TypeScript code structure for easy modding
 - **Retro Audio**: Web Audio API generated sound effects
@@ -40,10 +45,13 @@ A dimension-shifting platformer game built with Phaser 3, TypeScript, and Vite.
 
 ## 🎯 How to Play
 
+- **Start**: Press ENTER or SPACE on the start screen to begin
 - **Movement**: Use Arrow Keys or WASD to move left/right and jump
 - **Dimension Shift**: Press SPACE to switch between light and dark dimensions
 - **Objective**: Collect coins and powerups, reach the green portal to advance
 - **Lives**: You have 3 lives - avoid falling off the bottom of the world!
+- **Coin Types**: Bronze (1pt), Silver (5pt), Gold (10pt), Ruby (25pt)
+- **Powerups**: Mushrooms (score), 1-UPs (extra life), Fire Flowers (invincibility), Stars (super jump), Speed Boosts, and Poison (lose life)
 
 ## 🔧 Development
 
@@ -63,6 +71,8 @@ src/
 │   ├── data/
 │   │   └── levelMaps.ts       # Level map data
 │   ├── scenes/
+│   │   ├── StartScreenScene.ts # Game start screen
+│   │   ├── LoadingScene.ts     # Asset loading and level pre-baking
 │   │   └── QuantumJumperScene.ts # Main game scene
 │   ├── types/
 │   │   └── index.ts           # TypeScript type definitions
@@ -100,8 +110,18 @@ Edit the `LEVEL_MAPS` array in `src/game/data/levelMaps.ts`:
 
 - `P` = Player start position
 - `#` = Platform (solid ground)
-- `C` = Coin (collectible, +1 score)
-- `U` = Powerup (speed boost)
+- `C` = Bronze coin (1 point)
+- `B` = Bronze coin (1 point)
+- `S` = Silver coin (5 points)
+- `G` = Gold coin (10 points)
+- `R` = Ruby coin (25 points)
+- `U` = Mushroom powerup (score boost)
+- `M` = Mushroom powerup (score boost)
+- `1` = 1-UP powerup (extra life)
+- `X` = Poison powerup (lose life)
+- `F` = Fire flower (temporary invincibility)
+- `*` = Star powerup (super jump)
+- `T` = Speed boost powerup
 - `E` = Exit portal (level goal)
 - `.` = Empty space
 
@@ -126,7 +146,7 @@ Extend the `AudioSystem` class in `src/game/utils/AudioSystem.ts` to add new sou
 - **Language**: TypeScript 5.8+
 - **Physics**: Arcade Physics
 - **Audio**: Web Audio API
-- **Graphics**: Procedurally generated 32x32 pixel art
+- **Graphics**: Real SVG sprites with walking, jumping, and falling animations
 
 ## 📝 License
 
@@ -144,4 +164,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - Game concept and implementation: Quantum Jumper Team
 - Sound generation: Web Audio API
-- Sprites: Procedurally generated pixel art
+- Sprites: Custom SVG pixel art with animations

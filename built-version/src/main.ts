@@ -6,6 +6,8 @@
 
 import Phaser from "phaser";
 import { VIEWPORT_WIDTH, VIEWPORT_HEIGHT, GRAVITY } from "./game/constants";
+import { StartScreenScene } from "./game/scenes/StartScreenScene";
+import { LoadingScene } from "./game/scenes/LoadingScene";
 import { QuantumJumperScene } from "./game/scenes/QuantumJumperScene";
 
 // Phaser game configuration
@@ -21,7 +23,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: QuantumJumperScene,
+  scene: [StartScreenScene, LoadingScene, QuantumJumperScene],
   backgroundColor: "#87CEEB",
   scale: {
     mode: Phaser.Scale.FIT,
