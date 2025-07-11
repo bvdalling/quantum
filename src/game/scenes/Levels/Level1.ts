@@ -170,7 +170,7 @@ export class QuantumJumperScene extends Phaser.Scene {
     // The UI shows score, lives, level number, etc. at the top of the screen
     this.gameBuilder
       .setScore(this.gameState.score) // Display current score
-      .setLives(this.gameState.lives) // Display current lives
+      .withLives(this.gameState.lives) // Display current lives
       .setLevel(this.gameState.level) // Display current level number
       .showMessage("Welcome to Quantum Jumper!", 3000, "#00ff00") // Show green welcome message for 3 seconds
       .showControls(); // Show control instructions

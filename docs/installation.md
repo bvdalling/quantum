@@ -298,7 +298,7 @@ You should now see the Quantum Jumper start screen!
 
 **Controls:**
 - **Arrow Keys**: Move left and right
-- **Spacebar**: Jump
+- **Spacebar/Up**: Jump
 - **X Key**: Switch between Light and Dark dimensions
 - **Enter**: Start the game from the main menu
 

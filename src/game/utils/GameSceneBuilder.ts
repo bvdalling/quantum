@@ -50,7 +50,7 @@
  * Focus on learning how to USE the methods it provides.
  * The methods you'll use most are:
  * - addPlayer(), addPlatform(), addCoin(), addPowerup(), addPortal()
- * - setScore(), setLives(), setLevel()
+ * - setScore(), withLives(), setLevel()
  * - switchDimension()
  * - showMessage()
  */
@@ -989,7 +989,7 @@ export class GameSceneBuilder {
    * @param lives New lives value or amount to add (if relative is true)
    * @param relative If true, adds to current lives; if false, sets absolute value
    */
-  setLives(lives: number, relative: boolean = false): GameSceneBuilder {
+  withLives(lives: number, relative: boolean = false): GameSceneBuilder {
     if (this.player) {
       const currentLives = (this.player as any).lives || 3;
       (this.player as any).lives = relative ? currentLives + lives : lives;
@@ -1011,7 +1011,7 @@ export class GameSceneBuilder {
    * @param lives Lives to add (can be negative to remove)
    */
   addLives(lives: number): GameSceneBuilder {
-    return this.setLives(lives, true);
+    return this.withLives(lives, true);
   }
 
   /**
@@ -1124,7 +1124,7 @@ export class GameSceneBuilder {
    * Reset game state to initial values
    */
   resetGameState(): GameSceneBuilder {
-    return this.setScore(0).setLives(3).setLevel(1);
+    return this.setScore(0).withLives(3).setLevel(1);
   }
 
   /**

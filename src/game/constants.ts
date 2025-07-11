@@ -48,6 +48,7 @@ export const COYOTE_TIME = 100; // Milliseconds - allows jumping briefly after l
 export enum Dimension {
   LIGHT = 0, // The bright, sunny dimension (yellow/blue colors)
   DARK = 1, // The mysterious, shadowy dimension (purple/black colors)
+  BOTH = 2,
 }
 
 // === PLAYER STATES ===

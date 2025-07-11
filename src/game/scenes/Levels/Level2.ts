@@ -123,7 +123,7 @@ export class Level2Scene extends Phaser.Scene {
     // === STEP 3: SET UP UI ===
     this.gameBuilder
       .setScore(this.gameState.score)
-      .setLives(this.gameState.lives)
+      .withLives(this.gameState.lives)
       .setLevel(2) // Show "Level 2"
       .showMessage("Level 2: Dimension Mastery!", 3000, "#00aaff")
       .showControls();
