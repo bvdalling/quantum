@@ -25,8 +25,9 @@ src/
 ```
 
 ### Basic Scene Setup
+Lots of code? Don't worry - we will walk you through everything. You do not need to understand it all right now, just copy, paste, and follow along! Don't hesitate to ask a staff member (yellow lanyard) for help if you get stuck.
 
-Create a new file for your level:
+Create a new file for your level under `/src/game/scenes/Levels/` and name it `MyFirstLevel.ts`.:
 
 ```typescript
 // filepath: /src/game/scenes/Levels/MyFirstLevel.ts
@@ -48,7 +49,8 @@ export class MyFirstLevel extends Phaser.Scene {
   private spaceKey!: Phaser.Input.Keyboard.Key;
 
   constructor() {
-    super({ key: "MyFirstLevel" });
+    super({ key: "MyFirstLevel" }); // This will be the name of our scene. We will use this to switch between scenes.
+	// We can make a portal on level 2 to go to this level once level 2 is completed. Use Level1.ts as a reference if needed.
   }
 
   preload(): void {
@@ -140,7 +142,7 @@ export class MyFirstLevel extends Phaser.Scene {
       }
     }
 
-    // Add your level objects here!
+    // Add your level objects here! Platforms, coins, powerups, portals, whatever your heart desires!
     // See Building Game Objects Reference section below
   }
 
