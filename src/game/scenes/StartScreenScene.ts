@@ -117,8 +117,9 @@ export class StartScreenScene extends Phaser.Scene {
       .text(
         VIEWPORT_WIDTH / 2,
         210,
-        "• ARROW KEYS or WASD - Move and Jump\n" +
-          "• SPACEBAR - Switch Dimensions\n" +
+        "• ARROW KEYS - Move and Jump\n" +
+		  "• SPACEBAR/UP - Jump\n" +
+          "• X - Switch Dimensions\n" +
           "• Collect coins and powerups\n" +
           "• Reach the green portal to advance\n" +
           "• Avoid falling off the world!",

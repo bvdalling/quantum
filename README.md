@@ -18,7 +18,7 @@ A beginner-friendly 2D platformer game built with Phaser 3 and TypeScript, featu
 
 ## 🎯 Game Mechanics
 
-- **Movement**: Arrow keys to move, Spacebar to jump
+- **Movement**: Arrow keys to move, Spacebar/Up to jump
 - **Dimension Switching**: Press `X` to switch between Light and Dark dimensions
 - **Collectibles**: Coins worth different point values in each dimension
 - **Power-ups**: Speed boosts, extra lives, and special abilities
@@ -65,7 +65,7 @@ npm run preview
 
 1. **Start the Game**: Press Enter on the start screen
 2. **Move**: Use arrow keys to move left and right
-3. **Jump**: Press Spacebar to jump on platforms
+3. **Jump**: Press Spacebar/Up to jump on platforms
 4. **Switch Dimensions**: Press `X` to toggle between Light and Dark dimensions
 5. **Collect Items**: Walk over coins and power-ups to collect them
 6. **Reach the Portal**: Find and enter the portal to advance to the next level
@@ -90,35 +90,35 @@ npm run preview
 
 ```typescript
 // Creating a simple level with the fluent API
-const gameBuilder = new GameSceneBuilder(this)
-  .setWorldSize(15, 15)
-  .setScore(0)
-  .setLives(3);
+this.gameBuilder = createGameScene(this);
 
 // Add a player
-gameBuilder
+this.gameBuilder
   .addPlayer()
-  .setPosition(2, 12)
-  .setSpeed(200)
-  .setLives(3);
+  .withLives(3)
+  .withScore(0)
+  .atPosition(3, 12)
+  .withSpeed(200)
+  .withJumpPower(800)
+  .build();
 
 // Add platforms
-gameBuilder
+this.gameBuilder
   .addPlatform()
-  .setPosition(0, 13)
-  .setSize(15, 2)
-  .setDimension(Dimension.Both);
+  .atCoords(0, 13)
+  .withCollider()
+  .setSolid()
+  .setDimension("both")
+  .build();
 
 // Add collectibles
-gameBuilder
+this.gameBuilder
   .addCoin()
-  .setPosition(5, 10)
-  .setValue(25)
-  .setDimension(Dimension.Light);
-
-// Build the level
-gameBuilder.build();
-```
+  .atCoords(6, 10)
+  .withTexture("bronze-coin")
+  .animated()
+  .setDimension(Dimension.LIGHT)
+  .build();
 
 ## 🏗️ Project Structure
 
@@ -199,30 +199,39 @@ Each game object type has its own builder class:
 ### Basic Level Template
 
 ```typescript
-import { Scene } from 'phaser';
-import { GameSceneBuilder } from '../utils/GameSceneBuilder';
-import { Dimension } from '../constants';
+import Phaser from "phaser";
+import { createGameScene } from "../../utils/GameSceneBuilder";
+import { VIEWPORT_WIDTH, VIEWPORT_HEIGHT, Dimension } from "../../constants";
+import { AudioSystem } from "../../utils/AudioSystem";
+import { TextureGenerator } from "../../utils/TextureGenerator";
+import type { GameState } from "../../types";
 
-export class MyCustomLevel extends Scene {
+export class MyCustomLevel extends Phaser.Scene {
+  private gameBuilder!: ReturnType<typeof createGameScene>;
+  private gameState!: GameState;
+  private audioSystem!: AudioSystem;
+
   constructor() {
     super({ key: 'MyCustomLevel' });
   }
 
-  create() {
-    const gameBuilder = new GameSceneBuilder(this)
-      .setWorldSize(15, 15)
-      .setScore(0)
-      .setLives(3)
-      .setLevel(1);
-
-    // Add your level content here
-    gameBuilder
+  create(): void {
+    this.initializeState();
+    this.initializeSystems();
+    
+    this.gameBuilder = createGameScene(this);
+    
+    // Create player
+    const player = this.gameBuilder
       .addPlayer()
-      .setPosition(2, 12)
-      .setSpeed(200);
+      .withLives(3)
+      .withScore(0)
+      .atPosition(3, 12)
+      .withSpeed(200)
+      .withJumpPower(800)
+      .build();
 
-    // Build everything
-    gameBuilder.build();
+    this.gameBuilder.setMainPlayer(player);
   }
 }
 ```
@@ -231,25 +240,31 @@ export class MyCustomLevel extends Scene {
 
 ```typescript
 // Platform only in Light dimension
-gameBuilder
+this.gameBuilder
   .addPlatform()
-  .setPosition(5, 10)
-  .setSize(3, 1)
-  .setDimension(Dimension.Light);
+  .atCoords(5, 10)
+  .withCollider()
+  .setSolid()
+  .setDimension(Dimension.LIGHT)
+  .build();
 
 // Coin only in Dark dimension  
-gameBuilder
+this.gameBuilder
   .addCoin()
-  .setPosition(6, 9)
-  .setValue(50)
-  .setDimension(Dimension.Dark);
+  .atCoords(6, 9)
+  .withTexture("gold-coin")
+  .animated()
+  .setDimension(Dimension.DARK)
+  .build();
 
 // Power-up visible in both dimensions
-gameBuilder
+this.gameBuilder
   .addPowerup()
-  .setPosition(8, 8)
-  .setType('speed-boost')
-  .setDimension(Dimension.Both);
+  .atCoords(8, 8)
+  .ofType("mushroom")
+  .animated()
+  .setDimension("both")
+  .build();
 ```
 
 ## 🔧 Development
